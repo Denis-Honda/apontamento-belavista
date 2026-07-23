@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Apontamento de Produção — Visualização</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.js" integrity="sha384-iU8HYtnGQ8Cy4zl7gbNMOhsDTTKX02BTXptVP/vqAWIaTfM7isw76iyZCsjL2eVi" crossorigin="anonymous"></script>
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f5f7fa; --card-bg: #ffffff; --border: #e2e6ec; --text: #1f2937; --text-dim: #6b7280;
+    --primary: #1f4e78; --primary-light: #2e6da4; --green: #1a9c5c; --green-bg: #e8f8f0;
+    --red: #d0342c; --red-bg: #fdeceb; --amber: #b8860b; --amber-bg: #fdf3e0;
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font-family:"Segoe UI", Arial, sans-serif; font-size:14px; }
+  .wrap { max-width: 1260px; margin: 0 auto; padding: 20px 24px 60px; }
+  h1 { font-size: 20px; color: var(--primary); margin: 0 0 4px; }
+  .subtitle { color: var(--text-dim); margin: 0 0 20px; font-size: 13px; }
+  .badge-live { display:inline-block; background:var(--amber-bg); color:var(--amber); border:1px solid #e8c988; font-size:11px; font-weight:700; padding:3px 10px; border-radius:10px; margin-left:8px; vertical-align:middle; }
+  .panel { background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; margin-bottom: 20px; }
+  .panel h2 { font-size: 15px; margin: 0 0 14px; color: var(--primary); }
+  .panel h2 .hint { font-weight: 400; color: var(--text-dim); font-size: 11.5px; }
+  .machine-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  @media (max-width: 900px) { .machine-grid { grid-template-columns: repeat(2, 1fr); } .charts-row { grid-template-columns: 1fr !important; } }
+  @media (max-width: 520px) { .machine-grid { grid-template-columns: 1fr; } }
+  .m-card { border-radius: 8px; padding: 12px 14px; border: 1px solid var(--border); }
+  .m-card.op { background: var(--green-bg); border-color: #bfe8d3; }
+  .m-card.pa { background: var(--red-bg); border-color: #f3c6c3; }
+  .m-card.none { background: #f5f6f8; }
+  .m-name { font-weight: 700; font-size: 13px; margin-bottom: 4px; }
+  .m-status { font-size: 12px; font-weight: 700; }
+  .m-status.op { color: var(--green); } .m-status.pa { color: var(--red); } .m-status.none { color: var(--text-dim); }
+  .m-reason { font-size: 11.5px; color: var(--text-dim); margin-top: 2px; }
+  .m-prod { font-size: 11.5px; color: var(--text); margin-top: 4px; font-weight: 600; }
+  .m-time { font-size: 11px; color: var(--text-dim); margin-top: 1px; }
+  .m-time.warn { color: var(--red); font-weight: 700; }
+  .m-pulse { display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--green); margin-right:4px; animation: pulse 1.4s infinite; }
+  .m-pulse.red { background: var(--red); }
+  @keyframes pulse { 0% { opacity:1; } 50% { opacity:0.35; } 100% { opacity:1; } }
+  .kpi-row { display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+  .kpi { flex: 1; min-width: 140px; background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; }
+  .kpi .val { font-size: 22px; font-weight: 700; color: var(--primary); }
+  .kpi .lbl { font-size: 11.5px; color: var(--text-dim); }
+  .charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .chart-box { height: 260px; position: relative; }
+  table.hist { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  table.hist th { text-align: left; padding: 8px 6px; border-bottom: 2px solid var(--border); color: var(--text-dim); font-size: 11px; text-transform: uppercase; white-space: nowrap; }
+  table.hist td { padding: 7px 6px; border-bottom: 1px solid var(--border); vertical-align: middle; white-space: nowrap; }
+  table.hist tr:hover { background: #fafbfc; }
+  .hist-scroll { overflow-x: auto; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 700; }
+  .badge.op { background: var(--green-bg); color: var(--green); }
+  .badge.pa { background: var(--red-bg); color: var(--red); }
+  .badge.live { background: var(--amber-bg); color: var(--amber); }
+  .empty-note { color: var(--text-dim); font-size: 12.5px; padding: 10px 0; }
+  .top-bar { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; }
+  .refresh-note { font-size: 11.5px; color: var(--text-dim); }
+  .btn-ghost { background: transparent; border: 1px solid var(--border); border-radius: 6px; padding: 5px 10px; font-size: 12px; cursor: pointer; color: var(--text-dim); }
+  .btn-ghost:hover { border-color: var(--primary); color: var(--primary); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top-bar">
+    <div>
+      <h1>Apontamento de Produção<span class="badge-live">👁 Visualização ao vivo</span></h1>
+      <p class="subtitle">Status das máquinas, resumo e históricos — somente leitura, sem acesso a edição. Atualiza automaticamente.</p>
+    </div>
+    <div>
+      <button class="btn-ghost" onclick="loadData()">↻ Atualizar agora</button>
+      <div class="refresh-note" id="last-update">Carregando...</div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Status atual das máquinas <span id="status-data-label" class="hint"></span></h2>
+    <div class="machine-grid" id="machine-grid"></div>
+  </div>
+
+  <div class="panel">
+    <h2>Resumo geral (todos os registros)</h2>
+    <div class="kpi-row">
+      <div class="kpi"><div class="val" id="kpi-ordens-ativas">0</div><div class="lbl">Ordens em produção agora</div></div>
+      <div class="kpi"><div class="val" id="kpi-sacos-real">0</div><div class="lbl">Sacos produzidos (finalizadas)</div></div>
+      <div class="kpi"><div class="val" id="kpi-eficiencia">–</div><div class="lbl">Eficiência (tempo padrão / real)</div></div>
+      <div class="kpi"><div class="val" id="kpi-paradas-abertas">0</div><div class="lbl">Paradas em aberto agora</div></div>
+      <div class="kpi"><div class="val" id="kpi-horas-pa">0h</div><div class="lbl">Total horas paradas (encerradas)</div></div>
+      <div class="kpi"><div class="val" id="kpi-disp">–</div><div class="lbl">Disponibilidade geral</div></div>
+      <div class="kpi"><div class="val" id="kpi-refugo">0</div><div class="lbl">Total refugo (sacos)</div></div>
+      <div class="kpi"><div class="val" id="kpi-bags">0</div><div class="lbl">Total bags gerados (un.)</div></div>
+    </div>
+    <div class="charts-row">
+      <div><div class="chart-box"><canvas id="chart-motivo"></canvas></div></div>
+      <div><div class="chart-box"><canvas id="chart-tempo"></canvas></div></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Histórico de Ordens de Produção</h2>
+    <div class="hist-scroll" id="orders-hist-wrap"></div>
+  </div>
+
+  <div class="panel">
+    <h2>Histórico de Paradas</h2>
+    <div class="hist-scroll" id="hist-wrap"></div>
+  </div>
+</div>
+
+<script>
+const API_URL = "/api/data";
+const MAQUINAS = ["Máquina 00","Máquina 01","Máquina 02","Máquina 03","Máquina 04","Máquina 05","Máquina 06","Máquina Rensaque"];
+const MOTIVOS = ["Falta de energia","Falta de funcionário","Falta de Matéria-prima","Falta de Mecânico","Falta de Embalagem","Limpeza","Manutenção","Máquina quebrada","Reunião","Saída Médico / Particular","Trator quebrado","Treinamento"];
+const TURNO_WINDOWS = [
+  { nome: "1º Turno", inicio: 6, fim: 14 },
+  { nome: "2º Turno", inicio: 14, fim: 22 },
+  { nome: "3º Turno", inicio: 22, fim: 6 }
+];
+let charts = {};
+let ordens = [];
+let paradas = [];
+
+function todayStr(){ return new Date().toISOString().slice(0,10); }
+function hhmm(ts){ return ts ? new Date(ts).toTimeString().slice(0,5) : ''; }
+function diffHoras(iniTs, fimTs){
+  if (iniTs == null || fimTs == null) return null;
+  let diff = fimTs - iniTs;
+  if (diff < 0) diff += 24 * 3600000;
+  return diff / 3600000;
+}
+function fmtDur(hours){
+  if (hours == null || isNaN(hours)) return '–';
+  const h = Math.floor(hours);
+  const m = Math.round((hours - h) * 60);
+  return (h>0? h+'h ':'') + m + 'min';
+}
+function getCurrentTurno(){
+  const h = new Date().getHours();
+  for (const t of TURNO_WINDOWS){
+    if (t.inicio < t.fim){ if (h >= t.inicio && h < t.fim) return t.nome; }
+    else { if (h >= t.inicio || h < t.fim) return t.nome; }
+  }
+  return TURNO_WINDOWS[0].nome;
+}
+function horasDaParada(p){
+  return p.status === 'Encerrada' ? (p.horasParadas || 0) : diffHoras(p.horaInicioTs, Date.now());
+}
+function paradasDuringOrder(ps, o){
+  return ps.filter(p => p.maquina === o.maquina && p.horaInicioTs >= o.horaInicioTs);
+}
+
+async function loadData(){
+  document.getElementById('last-update').textContent = 'Atualizando...';
+  try {
+    const res = await fetch(API_URL, { cache: 'no-store' });
+    const data = await res.json();
+    ordens = Array.isArray(data.ordens) ? data.ordens : [];
+    paradas = Array.isArray(data.paradas) ? data.paradas : [];
+    const upd = data.updatedAt ? new Date(data.updatedAt).toLocaleTimeString('pt-BR') : '–';
+    document.getElementById('last-update').textContent = 'Últ. sincronização do painel: ' + upd + ' · atualizado agora ' + new Date().toLocaleTimeString('pt-BR');
+    renderAll();
+  } catch (e) {
+    document.getElementById('last-update').textContent = 'Falha ao atualizar — tentando novamente em instantes';
+  }
+}
+
+function renderStatusGrid(){
+  const hoje = todayStr();
+  const turnoAtual = getCurrentTurno();
+  document.getElementById('status-data-label').textContent = '— hoje (' + hoje.split('-').reverse().join('/') + ') · ' + turnoAtual + ' (atual)';
+  const grid = document.getElementById('machine-grid');
+  grid.innerHTML = '';
+  MAQUINAS.forEach(m => {
+    const activeOrder = ordens.find(o => o.maquina === m && o.status === 'Em Produção');
+    const openParada = paradas.find(p => p.maquina === m && p.status === 'Em Aberto');
+    const card = document.createElement('div');
+    if (activeOrder){
+      const elapsedH = diffHoras(activeOrder.horaInicioTs, Date.now());
+      const excede = activeOrder.tempoNecessario != null && elapsedH > activeOrder.tempoNecessario;
+      const during = paradasDuringOrder(paradas, activeOrder);
+      const horasDuring = during.reduce((s,p)=>s+horasDaParada(p),0);
+      card.className = 'm-card op';
+      card.innerHTML = `<div class="m-name">${m}</div>
+        <div class="m-status op"><span class="m-pulse"></span>Em Produção</div>
+        <div class="m-prod">${activeOrder.produto} · OP ${activeOrder.opNumero}</div>
+        <div class="m-time${excede?' warn':''}">Início ${hhmm(activeOrder.horaInicioTs)} · decorrido ${fmtDur(elapsedH)}${activeOrder.tempoNecessario!=null ? ' / '+activeOrder.tempoNecessario.toFixed(2)+'h' : ''}${excede?' ⚠':''}</div>
+        ${during.length ? `<div class="m-time warn">⚠ ${during.length} parada(s) durante a ordem (${horasDuring.toFixed(1)}h)</div>` : ''}`;
+    } else if (openParada){
+      const elapsedH = diffHoras(openParada.horaInicioTs, Date.now());
+      card.className = 'm-card pa';
+      card.innerHTML = `<div class="m-name">${m}</div>
+        <div class="m-status pa"><span class="m-pulse red"></span>Parada (em aberto)</div>
+        <div class="m-reason">${openParada.motivo} · ${openParada.turno}</div>
+        <div class="m-time warn">Início ${hhmm(openParada.horaInicioTs)} · decorrido ${fmtDur(elapsedH)}</div>`;
+    } else {
+      const latest = paradas.filter(r => r.maquina === m && r.status === 'Encerrada' && r.data === hoje && r.turno === turnoAtual).sort((a,b)=>b.ts-a.ts)[0];
+      if (!latest){
+        card.className = 'm-card none';
+        card.innerHTML = `<div class="m-name">${m}</div><div class="m-status none">Sem registro</div>`;
+      } else {
+        card.className = 'm-card pa';
+        card.innerHTML = `<div class="m-name">${m}</div><div class="m-status pa">● Parada (encerrada)</div><div class="m-reason">${latest.motivo || 'Motivo não informado'}</div>`;
+      }
+    }
+    grid.appendChild(card);
+  });
+}
+
+function renderKpisAndCharts(){
+  const finalizadas = ordens.filter(o => o.status === 'Finalizada');
+  const ativas = ordens.filter(o => o.status === 'Em Produção');
+  const paradasAbertas = paradas.filter(p => p.status === 'Em Aberto');
+  const paradasEncerradas = paradas.filter(p => p.status === 'Encerrada');
+  const totalPa = paradasEncerradas.reduce((s,r)=>s+(r.horasParadas||0),0);
+  const totalSacosReal = finalizadas.reduce((s,o)=>s+(o.qtdReal||0),0);
+  const tempoNecessarioTotal = finalizadas.reduce((s,o)=>s+(o.tempoNecessario||0),0);
+  const tempoRealTotal = finalizadas.reduce((s,o)=>s+(o.tempoReal||0),0);
+  const totalRefugo = finalizadas.reduce((s,o)=>s+(o.qtdRefugo||0),0);
+  const totalBags = finalizadas.reduce((s,o)=>s+(o.qtdBags||0),0);
+
+  document.getElementById('kpi-ordens-ativas').textContent = ativas.length;
+  document.getElementById('kpi-sacos-real').textContent = totalSacosReal.toLocaleString('pt-BR');
+  document.getElementById('kpi-eficiencia').textContent = tempoRealTotal > 0 ? ((tempoNecessarioTotal/tempoRealTotal)*100).toFixed(1)+'%' : '–';
+  document.getElementById('kpi-paradas-abertas').textContent = paradasAbertas.length;
+  document.getElementById('kpi-horas-pa').textContent = totalPa.toFixed(1)+'h';
+  document.getElementById('kpi-disp').textContent = (tempoRealTotal+totalPa) > 0 ? ((tempoRealTotal/(tempoRealTotal+totalPa))*100).toFixed(1)+'%' : '–';
+  document.getElementById('kpi-refugo').textContent = totalRefugo.toLocaleString('pt-BR');
+  document.getElementById('kpi-bags').textContent = totalBags.toLocaleString('pt-BR');
+
+  const motivoTotals = MOTIVOS.map(m => paradasEncerradas.filter(r=>r.motivo===m).reduce((s,r)=>s+(r.horasParadas||0),0));
+  const tempoNecPorMaquina = MAQUINAS.map(m => finalizadas.filter(o=>o.maquina===m).reduce((s,o)=>s+(o.tempoNecessario||0),0));
+  const tempoRealPorMaquina = MAQUINAS.map(m => finalizadas.filter(o=>o.maquina===m).reduce((s,o)=>s+(o.tempoReal||0),0));
+
+  const ctx1 = document.getElementById('chart-motivo').getContext('2d');
+  if (charts.motivo) charts.motivo.destroy();
+  charts.motivo = new Chart(ctx1, {
+    type: 'bar',
+    data: { labels: MOTIVOS, datasets: [{ label: 'Horas paradas', data: motivoTotals, backgroundColor: '#d0342c' }] },
+    options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+      plugins: { title: { display: true, text: 'Horas paradas por motivo (encerradas)' }, legend: { display: false } },
+      scales: { x: { beginAtZero: true } } }
+  });
+
+  const ctx2 = document.getElementById('chart-tempo').getContext('2d');
+  if (charts.tempo) charts.tempo.destroy();
+  charts.tempo = new Chart(ctx2, {
+    type: 'bar',
+    data: { labels: MAQUINAS, datasets: [
+      { label: 'Tempo necessário (h)', data: tempoNecPorMaquina, backgroundColor: '#1f4e78' },
+      { label: 'Tempo real (h)', data: tempoRealPorMaquina, backgroundColor: '#b8860b' }
+    ] },
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { title: { display: true, text: 'Tempo necessário x real por máquina (ordens finalizadas)' } },
+      scales: { y: { beginAtZero: true }, x: { ticks: { autoSkip: false, maxRotation: 45, minRotation: 45 } } } }
+  });
+}
+
+function renderOrdersHistory(){
+  const ords = ordens.slice().sort((a,b)=>b.ts-a.ts);
+  const wrap = document.getElementById('orders-hist-wrap');
+  if (ords.length === 0){ wrap.innerHTML = '<div class="empty-note">Nenhuma ordem de produção registrada ainda.</div>'; return; }
+  let html = '<table class="hist"><thead><tr><th>Data</th><th>Turno</th><th>Máquina</th><th>Nº OP</th><th>Produto</th><th>Qtd Plan.</th><th>Qtd Real</th><th>Início</th><th>Término</th><th>T. Necessário</th><th>T. Real</th><th>Refugo</th><th>Bags</th><th>Status</th><th>Obs.</th></tr></thead><tbody>';
+  ords.forEach(o => {
+    const dataFmt = o.data ? o.data.split('-').reverse().join('/') : '';
+    html += `<tr>
+      <td>${dataFmt}</td><td>${o.turno}</td><td>${o.maquina}</td><td>${o.opNumero}</td><td>${o.produto}</td>
+      <td>${(o.qtdPlanejada||0).toLocaleString('pt-BR')}</td>
+      <td>${o.qtdReal!=null ? o.qtdReal.toLocaleString('pt-BR') : '–'}</td>
+      <td>${hhmm(o.horaInicioTs)}</td>
+      <td>${o.horaTerminoTs!=null ? hhmm(o.horaTerminoTs) : '–'}</td>
+      <td>${o.tempoNecessario!=null ? o.tempoNecessario.toFixed(2)+'h' : '–'}</td>
+      <td>${o.tempoReal!=null ? o.tempoReal.toFixed(2)+'h' : '–'}</td>
+      <td>${o.refugo ? (o.qtdRefugo||0).toLocaleString('pt-BR')+' sacos' : '–'}</td>
+      <td>${o.bags ? (o.qtdBags||0).toLocaleString('pt-BR')+' un.' : '–'}</td>
+      <td><span class="badge ${o.status==='Em Produção'?'live':'op'}">${o.status}</span></td>
+      <td>${o.obs||''}</td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+}
+
+function renderHistory(){
+  const recs = paradas.slice().sort((a,b)=>b.ts-a.ts);
+  const wrap = document.getElementById('hist-wrap');
+  if (recs.length === 0){ wrap.innerHTML = '<div class="empty-note">Nenhuma parada registrada ainda.</div>'; return; }
+  let html = '<table class="hist"><thead><tr><th>Data</th><th>Turno</th><th>Máquina</th><th>Motivo</th><th>Início</th><th>Término</th><th>Horas paradas</th><th>Status</th><th>Obs.</th></tr></thead><tbody>';
+  recs.forEach(r => {
+    const dataFmt = r.data ? r.data.split('-').reverse().join('/') : '';
+    html += `<tr>
+      <td>${dataFmt}</td><td>${r.turno}</td><td>${r.maquina}</td><td>${r.motivo||'–'}</td>
+      <td>${hhmm(r.horaInicioTs)}</td>
+      <td>${r.horaTerminoTs!=null ? hhmm(r.horaTerminoTs) : '–'}</td>
+      <td>${r.horasParadas!=null ? r.horasParadas.toFixed(2)+'h' : '–'}</td>
+      <td><span class="badge ${r.status==='Em Aberto'?'live':'pa'}">${r.status}</span></td>
+      <td>${r.obs||''}</td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+}
+
+function renderAll(){
+  renderStatusGrid();
+  renderKpisAndCharts();
+  renderOrdersHistory();
+  renderHistory();
+}
+
+loadData();
+setInterval(loadData, 20000);
+</script>
+</body>
+</html>
