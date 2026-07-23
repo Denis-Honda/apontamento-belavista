@@ -73,6 +73,7 @@ function mapOrder(page: any) {
   const horaTermino = getText(p["Hora Término"]);
   return {
     id: getText(p["Local ID"]) || page.id,
+    notionId: page.id,
     data,
     turno: getSelect(p["Turno"]),
     maquina: getSelect(p["Máquina"]),
@@ -101,6 +102,7 @@ function mapParada(page: any) {
   const horaTermino = getText(p["Hora Término"]);
   return {
     id: getText(p["Local ID"]) || page.id,
+    notionId: page.id,
     data,
     turno: getSelect(p["Turno"]),
     maquina: getText(p["Máquina"]),
