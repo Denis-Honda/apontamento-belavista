@@ -64,6 +64,14 @@
   .prod-dia-sub { font-size: 11.5px; opacity: 0.75; margin-top: 2px; }
   .prod-dia-val { font-size: 34px; font-weight: 800; line-height: 1; }
   .prod-dia-unit { font-size: 14px; font-weight: 600; opacity: 0.88; }
+  .turno-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  @media (max-width: 700px) { .turno-grid { grid-template-columns: 1fr; } }
+  .turno-card { border: 1px solid var(--border); border-radius: 8px; padding: 13px 15px; background: #fafbfc; }
+  .turno-card .t-name { font-weight: 700; font-size: 13.5px; color: var(--primary); margin-bottom: 8px; }
+  .turno-card .t-row { display: flex; justify-content: space-between; align-items: baseline; font-size: 12.5px; margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--border); }
+  .turno-card .t-row:first-of-type { border-top: none; padding-top: 0; margin-top: 0; }
+  .turno-card .t-row .lbl { color: var(--text-dim); }
+  .turno-card .t-row .val { font-weight: 700; font-size: 14px; }
 </style>
 </head>
 <body>
@@ -87,6 +95,11 @@
       </div>
       <div class="prod-dia-val"><span id="kpi-produzido-hoje">0</span> <span class="prod-dia-unit">sacos</span></div>
     </div>
+  </div>
+
+  <div class="panel">
+    <h2>Produção por Turno <span class="hint">referente a hoje</span></h2>
+    <div class="turno-grid" id="turno-grid"></div>
   </div>
 
   <div class="panel">
@@ -132,6 +145,7 @@ const TURNO_WINDOWS = [
   { nome: "2º Turno", inicio: 14, fim: 22 },
   { nome: "3º Turno", inicio: 22, fim: 6 }
 ];
+const TURNOS = TURNO_WINDOWS.map(t => t.nome);
 let charts = {};
 let ordens = [];
 let paradas = [];
@@ -231,6 +245,26 @@ function renderProducaoHoje(){
   document.getElementById('prod-dia-sub').textContent = 'referente a ' + hoje.split('-').reverse().join('/') + ' · soma das ordens finalizadas no dia';
 }
 
+function renderProducaoPorTurno(){
+  const hoje = todayStr();
+  const finalizadasHoje = ordens.filter(o => o.status === 'Finalizada' && o.data === hoje);
+  const grid = document.getElementById('turno-grid');
+  grid.innerHTML = '';
+  TURNOS.forEach(turno => {
+    const subset = finalizadasHoje.filter(o => o.turno === turno);
+    const produzido = subset.reduce((s,o)=>s+(o.qtdReal||0),0);
+    const refugo = subset.reduce((s,o)=>s+(o.refugo ? (o.qtdRefugo||0) : 0),0);
+    const bags = subset.reduce((s,o)=>s+(o.bags ? (o.qtdBags||0) : 0),0);
+    const card = document.createElement('div');
+    card.className = 'turno-card';
+    card.innerHTML = `<div class="t-name">${turno}</div>
+      <div class="t-row"><span class="lbl">Produzido</span><span class="val">${produzido.toLocaleString('pt-BR')} sacos</span></div>
+      <div class="t-row"><span class="lbl">Refugo</span><span class="val">${refugo.toLocaleString('pt-BR')} sacos</span></div>
+      <div class="t-row"><span class="lbl">Bags</span><span class="val">${bags.toLocaleString('pt-BR')} un.</span></div>`;
+    grid.appendChild(card);
+  });
+}
+
 function renderKpisAndCharts(){
   const finalizadas = ordens.filter(o => o.status === 'Finalizada');
   const ativas = ordens.filter(o => o.status === 'Em Produção');
@@ -327,6 +361,7 @@ function renderHistory(){
 
 function renderAll(){
   renderProducaoHoje();
+  renderProducaoPorTurno();
   renderStatusGrid();
   renderKpisAndCharts();
   renderOrdersHistory();
