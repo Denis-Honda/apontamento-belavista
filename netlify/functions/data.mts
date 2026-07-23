@@ -14,6 +14,7 @@ const NOTION_VERSION = "2022-06-28";
 // endpoint (Notion-Version 2022-06-28) only accepts the former.
 const ORDERS_DS = "34adda41-950c-4d6d-8d2e-a200c9e9a896";
 const PARADAS_DS = "66ed6629-11b0-4326-bbab-f8eb448fadb8";
+const METAS_DS = "6fea4c44-24e9-4006-a74e-071bcf4a06cd";
 
 function getText(prop: any): string {
   if (!prop) return "";
@@ -110,8 +111,20 @@ function mapParada(page: any) {
     horaInicioTs: toTsFromDateAndTime(data, horaInicio),
     horaTerminoTs: horaTermino ? toTsFromDateAndTime(data, horaTermino) : null,
     horasParadas: getNumber(p["Horas Paradas"]),
+    qtdFuncionariosFaltantes: getNumber(p["Qtd Funcionários Faltantes"]),
     status: getSelect(p["Status"]),
     obs: getText(p["Observações"]),
+    ts: new Date(page.created_time).getTime(),
+  };
+}
+
+function mapMeta(page: any) {
+  const p = page.properties || {};
+  return {
+    notionId: page.id,
+    data: getDate(p["Data"]),
+    turno: getText(p["Turno"]),
+    meta: getNumber(p["Meta"]),
     ts: new Date(page.created_time).getTime(),
   };
 }
@@ -133,13 +146,15 @@ export default async (req: Request, context: Context) => {
   }
 
   try {
-    const [orderPages, paradaPages] = await Promise.all([
+    const [orderPages, paradaPages, metaPages] = await Promise.all([
       queryDataSource(ORDERS_DS, token),
       queryDataSource(PARADAS_DS, token),
+      queryDataSource(METAS_DS, token),
     ]);
     const ordens = orderPages.map(mapOrder);
     const paradas = paradaPages.map(mapParada);
-    return new Response(JSON.stringify({ ordens, paradas, updatedAt: Date.now() }), {
+    const metas = metaPages.map(mapMeta);
+    return new Response(JSON.stringify({ ordens, paradas, metas, updatedAt: Date.now() }), {
       status: 200,
       headers: { "Content-Type": "application/json", ...CORS_HEADERS },
     });

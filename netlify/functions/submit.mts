@@ -12,6 +12,7 @@ const CORS_HEADERS: Record<string, string> = {
 const NOTION_VERSION = "2022-06-28";
 const ORDERS_DB = "34adda41-950c-4d6d-8d2e-a200c9e9a896";
 const PARADAS_DB = "66ed6629-11b0-4326-bbab-f8eb448fadb8";
+const METAS_DB = "6fea4c44-24e9-4006-a74e-071bcf4a06cd";
 
 function rt(text: string) {
   return { rich_text: [{ text: { content: String(text ?? "") } }] };
@@ -61,6 +62,31 @@ async function notionRequest(path: string, method: string, token: string, body: 
     throw new Error(`Notion ${method} ${path} failed (${res.status}): ${text}`);
   }
   return text ? JSON.parse(text) : null;
+}
+
+// Usado apenas para o upsert de Metas (poucos registros — uma consulta cheia
+// é suficiente, sem precisar de filtro server-side).
+async function queryAllPages(dbId: string, token: string) {
+  const results: any[] = [];
+  let cursor: string | undefined;
+  do {
+    const data = await notionRequest(`/v1/databases/${dbId}/query`, "POST", token, {
+      page_size: 100,
+      start_cursor: cursor,
+    });
+    results.push(...((data && data.results) || []));
+    cursor = data && data.has_more ? data.next_cursor : undefined;
+  } while (cursor);
+  return results;
+}
+
+function getPlainText(prop: any): string {
+  if (!prop) return "";
+  const arr = prop.title || prop.rich_text || [];
+  return arr.map((t: any) => t.plain_text).join("");
+}
+function getPlainDate(prop: any): string | null {
+  return prop && prop.date ? prop.date.start : null;
 }
 
 export default async (req: Request, context: Context) => {
@@ -173,6 +199,9 @@ export default async (req: Request, context: Context) => {
       } else if (p.horasParadas !== undefined) {
         properties["Horas Paradas"] = num(p.horasParadas);
       }
+      if (p.qtdFuncionariosFaltantes !== undefined) {
+        properties["Qtd Funcionários Faltantes"] = num(p.qtdFuncionariosFaltantes);
+      }
       if (p.obs !== undefined) properties["Observações"] = rt(p.obs || "");
       await notionRequest(`/v1/pages/${p.notionId}`, "PATCH", token, { properties });
       return ok({ notionId: p.notionId });
@@ -194,11 +223,49 @@ export default async (req: Request, context: Context) => {
         Observações: rt(p.obs || ""),
         "Local ID": rt(localId),
       };
+      if (p.motivo === "Falta de funcionário" && p.qtdFuncionariosFaltantes !== undefined) {
+        properties["Qtd Funcionários Faltantes"] = num(p.qtdFuncionariosFaltantes);
+      }
       const page = await notionRequest("/v1/pages", "POST", token, {
         parent: { type: "database_id", database_id: PARADAS_DB },
         properties,
       });
       return ok({ notionId: page.id, localId });
+    }
+
+    // Metas de produção por turno: upsert (uma linha por data+turno) já que
+    // o operador reenvia os 3 valores toda vez que ajusta a meta do dia.
+    if (action === "salvar_metas") {
+      const p = payload || {};
+      const data = p.data || new Date().toISOString().slice(0, 10);
+      const metas: Record<string, any> = p.metas || {};
+      const existentes = await queryAllPages(METAS_DB, token);
+      const saved: any[] = [];
+      for (const turno of Object.keys(metas)) {
+        const valor = metas[turno];
+        if (valor === "" || valor === null || valor === undefined) continue;
+        const match = existentes.find((pg: any) => {
+          const props = pg.properties || {};
+          return getPlainDate(props["Data"]) === data && getPlainText(props["Turno"]) === turno;
+        });
+        const properties: any = {
+          Turno: title(turno),
+          Data: { date: { start: data } },
+          Meta: num(valor),
+        };
+        if (match) {
+          await notionRequest(`/v1/pages/${match.id}`, "PATCH", token, { properties });
+          saved.push({ turno, notionId: match.id });
+        } else {
+          properties["Local ID"] = rt(newLocalId("meta"));
+          const page = await notionRequest("/v1/pages", "POST", token, {
+            parent: { type: "database_id", database_id: METAS_DB },
+            properties,
+          });
+          saved.push({ turno, notionId: page.id });
+        }
+      }
+      return ok({ saved });
     }
 
     if (action === "encerrar_parada") {
