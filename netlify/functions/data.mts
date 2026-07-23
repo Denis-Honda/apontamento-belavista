@@ -9,8 +9,11 @@ const CORS_HEADERS: Record<string, string> = {
 };
 
 const NOTION_VERSION = "2022-06-28";
-const ORDERS_DS = "91d5a624-c248-46e7-9b4e-e43b2fdccb7e";
-const PARADAS_DS = "de82e7c6-b18c-4d59-855b-fdd37ea85227";
+// NOTE: these must be the *database* IDs (from the app.notion.com/p/... URL),
+// not the data-source/collection IDs — the legacy /v1/databases/{id}/query
+// endpoint (Notion-Version 2022-06-28) only accepts the former.
+const ORDERS_DS = "34adda41-950c-4d6d-8d2e-a200c9e9a896";
+const PARADAS_DS = "66ed6629-11b0-4326-bbab-f8eb448fadb8";
 
 function getText(prop: any): string {
   if (!prop) return "";
