@@ -72,6 +72,11 @@
   .turno-card .t-row:first-of-type { border-top: none; padding-top: 0; margin-top: 0; }
   .turno-card .t-row .lbl { color: var(--text-dim); }
   .turno-card .t-row .val { font-weight: 700; font-size: 14px; }
+  .turno-card .t-row .val.hit { color: var(--green); }
+  .turno-card .t-row .val.miss { color: var(--red); }
+  .prod-dia-meta { font-size: 12px; opacity: 0.85; margin-top: 4px; }
+  .prod-dia-meta .hit { color: #d7ffe9; font-weight: 700; }
+  .prod-dia-meta .miss { color: #ffdcd9; font-weight: 700; }
 </style>
 </head>
 <body>
@@ -93,7 +98,10 @@
         <div class="prod-dia-label">Total produzido hoje</div>
         <div class="prod-dia-sub" id="prod-dia-sub"></div>
       </div>
-      <div class="prod-dia-val"><span id="kpi-produzido-hoje">0</span> <span class="prod-dia-unit">sacos</span></div>
+      <div style="text-align:right;">
+        <div class="prod-dia-val"><span id="kpi-produzido-hoje">0</span> <span class="prod-dia-unit">sacos</span></div>
+        <div class="prod-dia-meta" id="prod-dia-meta-info"></div>
+      </div>
     </div>
   </div>
 
@@ -149,6 +157,7 @@ const TURNOS = TURNO_WINDOWS.map(t => t.nome);
 let charts = {};
 let ordens = [];
 let paradas = [];
+let metas = [];
 
 function todayStr(){ return new Date().toISOString().slice(0,10); }
 function hhmm(ts){ return ts ? new Date(ts).toTimeString().slice(0,5) : ''; }
@@ -186,6 +195,7 @@ async function loadData(){
     const data = await res.json();
     ordens = Array.isArray(data.ordens) ? data.ordens : [];
     paradas = Array.isArray(data.paradas) ? data.paradas : [];
+    metas = Array.isArray(data.metas) ? data.metas : [];
     const upd = data.updatedAt ? new Date(data.updatedAt).toLocaleTimeString('pt-BR') : '–';
     document.getElementById('last-update').textContent = 'Últ. sincronização do painel: ' + upd + ' · atualizado agora ' + new Date().toLocaleTimeString('pt-BR');
     renderAll();
@@ -243,6 +253,15 @@ function renderProducaoHoje(){
     .reduce((s,o)=>s+(o.qtdReal||0),0);
   document.getElementById('kpi-produzido-hoje').textContent = producaoHoje.toLocaleString('pt-BR');
   document.getElementById('prod-dia-sub').textContent = 'referente a ' + hoje.split('-').reverse().join('/') + ' · soma das ordens finalizadas no dia';
+
+  const metaHoje = metas.filter(m => m.data === hoje).reduce((s,m)=>s+(m.meta||0),0);
+  const metaInfo = document.getElementById('prod-dia-meta-info');
+  if (metaHoje > 0){
+    const pct = (producaoHoje / metaHoje) * 100;
+    metaInfo.innerHTML = `Meta do dia: ${metaHoje.toLocaleString('pt-BR')} sacos · <span class="${pct>=100?'hit':'miss'}">${pct.toFixed(1)}% atingido</span>`;
+  } else {
+    metaInfo.textContent = 'Meta do dia não definida';
+  }
 }
 
 function renderProducaoPorTurno(){
@@ -250,15 +269,20 @@ function renderProducaoPorTurno(){
   const finalizadasHoje = ordens.filter(o => o.status === 'Finalizada' && o.data === hoje);
   const grid = document.getElementById('turno-grid');
   grid.innerHTML = '';
+  const hoje2 = todayStr();
   TURNOS.forEach(turno => {
     const subset = finalizadasHoje.filter(o => o.turno === turno);
     const produzido = subset.reduce((s,o)=>s+(o.qtdReal||0),0);
     const refugo = subset.reduce((s,o)=>s+(o.refugo ? (o.qtdRefugo||0) : 0),0);
     const bags = subset.reduce((s,o)=>s+(o.bags ? (o.qtdBags||0) : 0),0);
+    const metaTurno = metas.find(m => m.data === hoje2 && m.turno === turno);
+    const meta = metaTurno ? (metaTurno.meta || 0) : null;
     const card = document.createElement('div');
     card.className = 'turno-card';
     card.innerHTML = `<div class="t-name">${turno}</div>
       <div class="t-row"><span class="lbl">Produzido</span><span class="val">${produzido.toLocaleString('pt-BR')} sacos</span></div>
+      <div class="t-row"><span class="lbl">Meta</span><span class="val">${meta!=null ? meta.toLocaleString('pt-BR')+' sacos' : '–'}</span></div>
+      ${meta ? `<div class="t-row"><span class="lbl">Atingido</span><span class="val ${produzido>=meta?'hit':'miss'}">${((produzido/meta)*100).toFixed(1)}%</span></div>` : ''}
       <div class="t-row"><span class="lbl">Refugo</span><span class="val">${refugo.toLocaleString('pt-BR')} sacos</span></div>
       <div class="t-row"><span class="lbl">Bags</span><span class="val">${bags.toLocaleString('pt-BR')} un.</span></div>`;
     grid.appendChild(card);
@@ -343,7 +367,7 @@ function renderHistory(){
   const recs = paradas.slice().sort((a,b)=>b.ts-a.ts);
   const wrap = document.getElementById('hist-wrap');
   if (recs.length === 0){ wrap.innerHTML = '<div class="empty-note">Nenhuma parada registrada ainda.</div>'; return; }
-  let html = '<table class="hist"><thead><tr><th>Data</th><th>Turno</th><th>Máquina</th><th>Motivo</th><th>Início</th><th>Término</th><th>Horas paradas</th><th>Status</th><th>Obs.</th></tr></thead><tbody>';
+  let html = '<table class="hist"><thead><tr><th>Data</th><th>Turno</th><th>Máquina</th><th>Motivo</th><th>Início</th><th>Término</th><th>Horas paradas</th><th>Func. Faltantes</th><th>Status</th><th>Obs.</th></tr></thead><tbody>';
   recs.forEach(r => {
     const dataFmt = r.data ? r.data.split('-').reverse().join('/') : '';
     html += `<tr>
@@ -351,6 +375,7 @@ function renderHistory(){
       <td>${hhmm(r.horaInicioTs)}</td>
       <td>${r.horaTerminoTs!=null ? hhmm(r.horaTerminoTs) : '–'}</td>
       <td>${r.horasParadas!=null ? r.horasParadas.toFixed(2)+'h' : '–'}</td>
+      <td>${r.motivo === 'Falta de funcionário' ? (r.qtdFuncionariosFaltantes ?? '–') : '–'}</td>
       <td><span class="badge ${r.status==='Em Aberto'?'live':'pa'}">${r.status}</span></td>
       <td>${r.obs||''}</td>
     </tr>`;

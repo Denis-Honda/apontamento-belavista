@@ -18,8 +18,8 @@
   h1 { font-size: 19px; color: var(--primary); margin: 0 0 4px; }
   .subtitle { color: var(--text-dim); margin: 0 0 16px; font-size: 12.5px; }
   .subtitle a { color: var(--primary-light); text-decoration: none; }
-  .tabs { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; margin-bottom: 16px; }
-  .tab-btn { background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 9px 3px; font-size: 11px; font-weight: 700; color: var(--text-dim); cursor: pointer; text-align: center; }
+  .tabs { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; margin-bottom: 16px; }
+  .tab-btn { background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 9px 2px; font-size: 10.5px; font-weight: 700; color: var(--text-dim); cursor: pointer; text-align: center; }
   .tab-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
   .panel { background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; padding: 18px 18px 20px; margin-bottom: 16px; }
   .panel h2 { font-size: 15px; margin: 0 0 14px; color: var(--primary); }
@@ -77,6 +77,7 @@
     <div class="tab-btn" data-tab="iniciar_parada" onclick="switchTab('iniciar_parada')">Iniciar<br>Parada</div>
     <div class="tab-btn" data-tab="encerrar_parada" onclick="switchTab('encerrar_parada')">Encerrar<br>Parada</div>
     <div class="tab-btn" data-tab="registros" onclick="switchTab('registros')">Registros</div>
+    <div class="tab-btn" data-tab="metas" onclick="switchTab('metas')">Metas</div>
   </div>
 
   <!-- INICIAR ORDEM -->
@@ -135,7 +136,8 @@
         <div class="field"><label>Máquina *</label><select name="maquina" required></select></div>
         <div class="field"><label>Turno *</label><select name="turno" required></select></div>
       </div>
-      <div class="field"><label>Motivo *</label><select name="motivo" required></select></div>
+      <div class="field"><label>Motivo *</label><select name="motivo" required onchange="onMotivoChange()"></select></div>
+      <div class="field hidden" id="wrap-funcionarios-faltantes"><label>Quantas pessoas faltaram?</label><input type="number" name="qtdFuncionariosFaltantes" min="0" step="1"></div>
       <div class="field"><label>Hora Início</label><input type="time" name="horaInicio"></div>
       <div class="field"><label>Observações</label><textarea name="obs"></textarea></div>
       <button class="submit" type="submit">Iniciar Parada</button>
@@ -167,6 +169,16 @@
     <div id="reg-ordens"><div class="empty-note">Carregando...</div></div>
     <div class="reg-section-title">Paradas</div>
     <div id="reg-paradas"><div class="empty-note">Carregando...</div></div>
+  </div>
+
+  <!-- METAS POR TURNO -->
+  <div class="panel tab-panel hidden" id="panel-metas">
+    <h2>Meta de Produção por Turno<span class="hint" style="display:block;font-weight:400;color:var(--text-dim);font-size:11.5px;margin-top:2px;">referente a hoje — comparado ao realizado no painel de visualização</span></h2>
+    <div class="field"><label>1º Turno (sacos)</label><input type="number" id="meta-1o-turno" min="0"></div>
+    <div class="field"><label>2º Turno (sacos)</label><input type="number" id="meta-2o-turno" min="0"></div>
+    <div class="field"><label>3º Turno (sacos)</label><input type="number" id="meta-3o-turno" min="0"></div>
+    <button class="submit" type="button" onclick="salvarMetas()">Salvar Metas do Dia</button>
+    <div class="msg hidden" id="msg-metas"></div>
   </div>
 </div>
 
@@ -254,6 +266,11 @@ document.querySelector('#form-iniciar_parada select[name=maquina]').innerHTML = 
 fillSelect(document.querySelector('#form-iniciar_parada select[name=maquina]'), MAQUINAS, 'Selecione');
 fillSelect(document.querySelector('#form-iniciar_parada select[name=motivo]'), MOTIVOS, 'Selecione');
 
+function onMotivoChange(){
+  const motivo = document.querySelector('#form-iniciar_parada select[name=motivo]').value;
+  document.getElementById('wrap-funcionarios-faltantes').classList.toggle('hidden', motivo !== 'Falta de funcionário');
+}
+
 const selProduto = document.getElementById('op-produto');
 fillSelect(selProduto, PRODUTOS.map(p => p[0]), 'Selecione o produto');
 selProduto.appendChild(new Option('+ Adicionar novo produto...', NOVO_PRODUTO_VALUE));
@@ -300,6 +317,7 @@ function switchTab(tab) {
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('hidden', p.id !== 'panel-' + tab));
   if (tab === 'finalizar_ordem' || tab === 'encerrar_parada') loadOpenRecords();
   if (tab === 'registros') loadRegistros();
+  if (tab === 'metas') loadMetas();
 }
 
 function toggleQty(kind) {
@@ -376,6 +394,9 @@ async function submitForm(ev, action) {
     payload.refugo = document.getElementById('refugo-hidden').value === 'true';
     payload.bags = document.getElementById('bags-hidden').value === 'true';
   }
+  if (action === 'iniciar_parada' && payload.motivo !== 'Falta de funcionário') {
+    delete payload.qtdFuncionariosFaltantes;
+  }
   btn.disabled = true;
   try {
     const res = await fetch('/api/submit', {
@@ -396,6 +417,9 @@ async function submitForm(ev, action) {
       document.getElementById('wrap-produto-novo').classList.add('hidden');
       document.getElementById('wrap-produto-novo-setup').classList.add('hidden');
       document.getElementById('op-tempo-preview').value = '';
+    }
+    if (action === 'iniciar_parada') {
+      document.getElementById('wrap-funcionarios-faltantes').classList.add('hidden');
     }
     if (action === 'finalizar_ordem' || action === 'encerrar_parada') loadOpenRecords();
   } catch (e) {
@@ -453,6 +477,7 @@ function renderParadaCard(p){
         <div class="reg-card-title">${escapeHtml(p.maquina)} — ${escapeHtml(p.motivo||'')}</div>
         <div class="reg-card-sub">${dataFmt} · ${escapeHtml(p.turno)}</div>
         <div class="reg-card-sub">Início ${tsToHHMM(p.horaInicioTs)||'–'} · Término ${tsToHHMM(p.horaTerminoTs)||'–'} · ${p.horasParadas!=null?p.horasParadas.toFixed(2)+'h':'–'}</div>
+        ${p.motivo === 'Falta de funcionário' ? `<div class="reg-card-sub">Funcionários faltantes: ${p.qtdFuncionariosFaltantes ?? '–'}</div>` : ''}
       </div>
       <div style="text-align:right;">
         ${badge}<br><button class="btn-edit" style="margin-top:6px;" onclick="toggleEdit('p','${p.notionId}')">Editar</button>
@@ -464,6 +489,7 @@ function renderParadaCard(p){
         <div class="field"><label>Hora Término</label><input type="time" id="e-p-termino-${p.notionId}" value="${tsToHHMM(p.horaTerminoTs)}"></div>
       </div>
       <div class="field"><label>Horas Paradas</label><input type="number" min="0" step="0.1" id="e-p-horas-${p.notionId}" value="${p.horasParadas??''}"></div>
+      ${p.motivo === 'Falta de funcionário' ? `<div class="field"><label>Funcionários Faltantes</label><input type="number" min="0" step="1" id="e-p-funcfalt-${p.notionId}" value="${p.qtdFuncionariosFaltantes??''}"></div>` : ''}
       <button class="btn-save" onclick="salvarEdicaoParada('${p.notionId}')">Salvar alteração</button>
       <div class="reg-msg hidden" id="msg-edit-p-${p.notionId}"></div>
     </div>
@@ -529,6 +555,8 @@ async function salvarEdicaoParada(id){
     horaTermino: document.getElementById(`e-p-termino-${id}`).value,
     horasParadas: document.getElementById(`e-p-horas-${id}`).value,
   };
+  const funcFaltEl = document.getElementById(`e-p-funcfalt-${id}`);
+  if (funcFaltEl) payload.qtdFuncionariosFaltantes = funcFaltEl.value;
   btn.disabled = true;
   try {
     const res = await fetch('/api/submit', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({action:'editar_parada', payload}) });
@@ -577,6 +605,7 @@ async function exportExcel(){
       'Hora Início': tsToHHMM(p.horaInicioTs),
       'Hora Término': tsToHHMM(p.horaTerminoTs),
       'Horas Paradas': p.horasParadas ?? '',
+      'Funcionários Faltantes': p.motivo === 'Falta de funcionário' ? (p.qtdFuncionariosFaltantes ?? '') : '',
       'Status': p.status || '',
       'Observações': p.obs || '',
     }));
@@ -588,6 +617,54 @@ async function exportExcel(){
     msg.className = 'reg-msg ok'; msg.textContent = 'Arquivo exportado.';
   } catch (e) {
     msg.className = 'reg-msg err'; msg.textContent = 'Erro ao exportar: ' + (e.message || e);
+  }
+}
+
+const TURNO_META_INPUT_IDS = {
+  '1º Turno': 'meta-1o-turno',
+  '2º Turno': 'meta-2o-turno',
+  '3º Turno': 'meta-3o-turno',
+};
+
+async function loadMetas(){
+  const msg = document.getElementById('msg-metas');
+  msg.classList.add('hidden');
+  Object.values(TURNO_META_INPUT_IDS).forEach(id => { document.getElementById(id).value = ''; });
+  try {
+    const res = await fetch('/api/data');
+    const data = await res.json();
+    const hoje = todayISO();
+    (data.metas || []).filter(m => m.data === hoje).forEach(m => {
+      const inputId = TURNO_META_INPUT_IDS[m.turno];
+      if (inputId && m.meta != null) document.getElementById(inputId).value = m.meta;
+    });
+  } catch (e) {
+    // silencioso — os campos simplesmente ficam vazios para novo lançamento
+  }
+}
+
+async function salvarMetas(){
+  const btn = document.querySelector('#panel-metas button.submit');
+  const msg = document.getElementById('msg-metas');
+  msg.classList.remove('hidden');
+  const metas = {};
+  Object.entries(TURNO_META_INPUT_IDS).forEach(([turno, id]) => {
+    metas[turno] = document.getElementById(id).value;
+  });
+  btn.disabled = true;
+  try {
+    const res = await fetch('/api/submit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'salvar_metas', payload: { data: todayISO(), metas } }),
+    });
+    const j = await res.json();
+    if (!res.ok || j.error) throw new Error(j.error || 'Falha ao salvar metas');
+    msg.textContent = 'Metas salvas.'; msg.className = 'msg ok';
+  } catch (e) {
+    msg.textContent = e.message || 'Erro ao salvar metas'; msg.className = 'msg err';
+  } finally {
+    btn.disabled = false;
   }
 }
 
