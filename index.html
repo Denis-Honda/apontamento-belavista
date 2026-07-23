@@ -110,6 +110,23 @@
     <div class="turno-grid" id="turno-grid"></div>
   </div>
 
+  <div class="panel prod-dia">
+    <div class="prod-dia-inner">
+      <div>
+        <div class="prod-dia-label">Total produzido no mês</div>
+        <div class="prod-dia-sub" id="prod-mes-sub"></div>
+      </div>
+      <div style="text-align:right;">
+        <div class="prod-dia-val"><span id="kpi-produzido-mes">0</span> <span class="prod-dia-unit">sacos</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Acumulado por Mês <span class="hint">comparação entre meses</span></h2>
+    <div class="hist-scroll" id="meses-wrap"></div>
+  </div>
+
   <div class="panel">
     <h2>Status atual das máquinas <span id="status-data-label" class="hint"></span></h2>
     <div class="machine-grid" id="machine-grid"></div>
@@ -284,6 +301,61 @@ function renderProducaoHoje(){
   }
 }
 
+// "YYYY-MM" a partir de uma data "YYYY-MM-DD" — chave de agrupamento mensal.
+function monthKey(dateStr){ return dateStr ? dateStr.slice(0,7) : null; }
+function monthLabel(key){
+  const nomes = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  const [y, m] = key.split('-');
+  return nomes[parseInt(m,10)-1] + '/' + y;
+}
+
+function renderProducaoMensal(){
+  const mesAtual = monthKey(todayStr());
+  const finalizadas = ordens.filter(o => o.status === 'Finalizada');
+
+  const porMes = {};
+  finalizadas.forEach(o => {
+    const key = monthKey(o.data);
+    if (!key) return;
+    if (!porMes[key]) porMes[key] = { produzido: 0, refugo: 0, bags: 0, ordens: 0 };
+    porMes[key].produzido += (o.qtdReal || 0);
+    porMes[key].refugo += (o.refugo ? (o.qtdRefugo || 0) : 0);
+    porMes[key].bags += (o.bags ? (o.qtdBags || 0) : 0);
+    porMes[key].ordens += 1;
+  });
+
+  const totalMesAtual = porMes[mesAtual] ? porMes[mesAtual].produzido : 0;
+  document.getElementById('kpi-produzido-mes').textContent = totalMesAtual.toLocaleString('pt-BR');
+  document.getElementById('prod-mes-sub').textContent = 'referente a ' + monthLabel(mesAtual) + ' · soma das ordens finalizadas no mês';
+
+  const meses = Object.keys(porMes).sort().reverse(); // mês mais recente primeiro
+  const wrap = document.getElementById('meses-wrap');
+  if (!meses.length){
+    wrap.innerHTML = '<div class="empty-note">Nenhum registro finalizado ainda.</div>';
+    return;
+  }
+  let html = '<table class="hist"><thead><tr><th>Mês</th><th>Sacos produzidos</th><th>Refugo</th><th>Bags</th><th>Ordens finalizadas</th><th>Variação vs. mês anterior</th></tr></thead><tbody>';
+  meses.forEach((key, idx) => {
+    const m = porMes[key];
+    const anterior = meses[idx + 1] ? porMes[meses[idx + 1]] : null;
+    let variacao = '–';
+    if (anterior && anterior.produzido > 0){
+      const pct = ((m.produzido - anterior.produzido) / anterior.produzido) * 100;
+      variacao = `<span style="font-weight:700;color:${pct >= 0 ? 'var(--green)' : 'var(--red)'}">${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%</span>`;
+    }
+    html += `<tr>
+      <td>${monthLabel(key)}${key === mesAtual ? ' <span class="badge live">atual</span>' : ''}</td>
+      <td>${m.produzido.toLocaleString('pt-BR')}</td>
+      <td>${m.refugo.toLocaleString('pt-BR')}</td>
+      <td>${m.bags.toLocaleString('pt-BR')}</td>
+      <td>${m.ordens}</td>
+      <td>${variacao}</td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+}
+
 function renderProducaoPorTurno(){
   const hoje = todayStr();
   const finalizadasHoje = ordens.filter(o => o.status === 'Finalizada' && o.data === hoje);
@@ -410,6 +482,7 @@ function renderHistory(){
 
 function renderAll(){
   renderProducaoHoje();
+  renderProducaoMensal();
   renderProducaoPorTurno();
   renderStatusGrid();
   renderKpisAndCharts();

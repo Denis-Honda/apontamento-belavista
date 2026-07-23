@@ -86,9 +86,10 @@
     <form id="form-iniciar_ordem" onsubmit="return submitForm(event,'iniciar_ordem')">
       <div class="field"><label>Nº OP *</label><input type="text" name="opNumero" required></div>
       <div class="row2">
-        <div class="field"><label>Máquina *</label><select name="maquina" required></select></div>
+        <div class="field"><label>Data</label><input type="date" name="data"></div>
         <div class="field"><label>Turno *</label><select name="turno" required></select></div>
       </div>
+      <div class="field"><label>Máquina *</label><select name="maquina" required></select></div>
       <div class="field"><label>Produto *</label><select name="produtoSelect" id="op-produto" required onchange="onProdutoChange()"></select></div>
       <div class="row2 hidden" id="wrap-produto-novo">
         <div class="field"><label>Nome do novo produto</label><input type="text" id="op-produto-novo-nome" oninput="updateTempoPreview()"></div>
@@ -133,9 +134,10 @@
     <h2>Iniciar Parada</h2>
     <form id="form-iniciar_parada" onsubmit="return submitForm(event,'iniciar_parada')">
       <div class="row2">
-        <div class="field"><label>Máquina *</label><select name="maquina" required></select></div>
+        <div class="field"><label>Data</label><input type="date" name="data"></div>
         <div class="field"><label>Turno *</label><select name="turno" required></select></div>
       </div>
+      <div class="field"><label>Máquina *</label><select name="maquina" required></select></div>
       <div class="field"><label>Motivo *</label><select name="motivo" required onchange="onMotivoChange()"></select></div>
       <div class="field hidden" id="wrap-funcionarios-faltantes"><label>Quantas pessoas faltaram?</label><input type="number" name="qtdFuncionariosFaltantes" min="0" step="1"></div>
       <div class="field"><label>Hora Início</label><input type="time" name="horaInicio"></div>
@@ -279,6 +281,7 @@ function todayISO() {
 }
 
 document.querySelectorAll('input[type=time]').forEach(el => el.value = nowHHMM());
+document.querySelectorAll('input[type=date]').forEach(el => el.value = todayISO());
 
 document.querySelectorAll('#form-iniciar_ordem select[name=maquina]').forEach(el => fillSelect(el, MAQUINAS, 'Selecione'));
 document.querySelectorAll('select[name=turno]').forEach(el => fillSelect(el, TURNOS, 'Selecione'));
@@ -426,7 +429,7 @@ async function submitForm(ev, action) {
   const fd = new FormData(form);
   const payload = {};
   fd.forEach((v, k) => { payload[k] = v; });
-  if (action === 'iniciar_ordem' || action === 'iniciar_parada') payload.data = todayISO();
+  if ((action === 'iniciar_ordem' || action === 'iniciar_parada') && !payload.data) payload.data = todayISO();
   if (action === 'iniciar_ordem') {
     delete payload.produtoSelect;
     const p = getProdutoAtual();
@@ -454,6 +457,7 @@ async function submitForm(ev, action) {
     showMsg(action, true, 'Lançado com sucesso.');
     form.reset();
     form.querySelectorAll('input[type=time]').forEach(el => el.value = nowHHMM());
+    form.querySelectorAll('input[type=date]').forEach(el => el.value = todayISO());
     if (action === 'finalizar_ordem' || action === 'iniciar_ordem') {
       document.getElementById('refugo-qty-wrap')?.classList.add('hidden');
       document.getElementById('bags-qty-wrap')?.classList.add('hidden');
@@ -499,6 +503,7 @@ function renderOrdemCard(o){
       </div>
     </div>
     <div class="reg-edit hidden" id="edit-o-${o.notionId}">
+      <div class="field"><label>Data</label><input type="date" id="e-o-data-${o.notionId}" value="${o.data||''}"></div>
       <div class="row2">
         <div class="field"><label>Hora Início</label><input type="time" id="e-o-inicio-${o.notionId}" value="${tsToHHMM(o.horaInicioTs)}"></div>
         <div class="field"><label>Hora Término</label><input type="time" id="e-o-termino-${o.notionId}" value="${tsToHHMM(o.horaTerminoTs)}"></div>
@@ -530,6 +535,7 @@ function renderParadaCard(p){
       </div>
     </div>
     <div class="reg-edit hidden" id="edit-p-${p.notionId}">
+      <div class="field"><label>Data</label><input type="date" id="e-p-data-${p.notionId}" value="${p.data||''}"></div>
       <div class="row2">
         <div class="field"><label>Hora Início</label><input type="time" id="e-p-inicio-${p.notionId}" value="${tsToHHMM(p.horaInicioTs)}"></div>
         <div class="field"><label>Hora Término</label><input type="time" id="e-p-termino-${p.notionId}" value="${tsToHHMM(p.horaTerminoTs)}"></div>
@@ -572,6 +578,7 @@ async function salvarEdicaoOrdem(id){
   msg.classList.remove('hidden');
   const payload = {
     notionId: id,
+    data: document.getElementById(`e-o-data-${id}`).value,
     horaInicio: document.getElementById(`e-o-inicio-${id}`).value,
     horaTermino: document.getElementById(`e-o-termino-${id}`).value,
     qtdPlanejada: document.getElementById(`e-o-planejada-${id}`).value,
@@ -597,6 +604,7 @@ async function salvarEdicaoParada(id){
   msg.classList.remove('hidden');
   const payload = {
     notionId: id,
+    data: document.getElementById(`e-p-data-${id}`).value,
     horaInicio: document.getElementById(`e-p-inicio-${id}`).value,
     horaTermino: document.getElementById(`e-p-termino-${id}`).value,
     horasParadas: document.getElementById(`e-p-horas-${id}`).value,
