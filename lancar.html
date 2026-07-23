@@ -149,9 +149,10 @@
   <div class="panel tab-panel hidden" id="panel-encerrar_parada">
     <h2>Encerrar Parada</h2>
     <form id="form-encerrar_parada" onsubmit="return submitForm(event,'encerrar_parada')">
-      <div class="field"><label>Parada em aberto *</label><select name="notionId" id="select-paradas" required></select></div>
+      <div class="field"><label>Parada em aberto *</label><select name="notionId" id="select-paradas" required onchange="updateImpactoPreview()"></select></div>
       <div class="field"><label>Hora Término</label><input type="time" name="horaTermino"></div>
-      <div class="field"><label>Horas Paradas</label><input type="number" name="horasParadas" min="0" step="0.1"></div>
+      <div class="field"><label>Horas Paradas</label><input type="number" name="horasParadas" id="encerrar-horas-paradas" min="0" step="0.1" oninput="updateImpactoPreview()"></div>
+      <div class="field hint" id="impacto-preview" style="display:none;font-size:12.5px;color:var(--red);font-weight:600;margin-top:-8px;"></div>
       <div class="field"><label>Observações</label><textarea name="obs"></textarea></div>
       <button class="submit" type="submit">Encerrar Parada</button>
       <div class="msg hidden" id="msg-encerrar_parada"></div>
@@ -234,6 +235,25 @@ const PRODUTOS = [
 const PRODUTOS_MAP = {};
 PRODUTOS.forEach(p => { PRODUTOS_MAP[p[0]] = { sacosHora: p[1], setup: p[2] }; });
 const NOVO_PRODUTO_VALUE = '__novo__';
+
+// Sacos/hora de referência por máquina, para converter horas paradas por
+// "Falta de funcionário" em sacos não produzidos (mesma tabela da visualização).
+const TAXA_IMPACTO_FALTA_FUNC = {
+  "Máquina 00": 150,
+  "Máquina 01": 200,
+  "Máquina 02": 450,
+  "Máquina 03": 300,
+  "Máquina 04": 450,
+  "Máquina 05": 300,
+  "Máquina 06": 450,
+};
+function calcSacosNaoProduzidos(maquina, motivo, horas){
+  if (motivo !== 'Falta de funcionário') return null;
+  const taxa = TAXA_IMPACTO_FALTA_FUNC[maquina];
+  if (!taxa || !horas) return null;
+  return Math.round(horas * taxa);
+}
+let paradasAbertasCache = [];
 
 function fillSelect(sel, options, placeholder) {
   sel.innerHTML = '';
@@ -336,6 +356,7 @@ async function loadOpenRecords() {
     const data = await res.json();
     const ordensAbertas = (data.ordens || []).filter(o => o.status === 'Em Produção');
     const paradasAbertas = (data.paradas || []).filter(p => p.status === 'Em Aberto');
+    paradasAbertasCache = paradasAbertas;
 
     selOrdens.innerHTML = '';
     if (!ordensAbertas.length) {
@@ -366,6 +387,30 @@ async function loadOpenRecords() {
     selOrdens.innerHTML = '<option value="" disabled selected>Erro ao carregar</option>';
     selParadas.innerHTML = '<option value="" disabled selected>Erro ao carregar</option>';
   }
+}
+
+// Preview em tempo real, no formulário de Encerrar Parada, do impacto em
+// sacos não produzidos quando o motivo da parada é "Falta de funcionário".
+function updateImpactoPreview() {
+  const sel = document.getElementById('select-paradas');
+  const box = document.getElementById('impacto-preview');
+  if (!sel || !box) return;
+  const notionId = sel.value;
+  const parada = paradasAbertasCache.find(p => p.notionId === notionId);
+  const horas = parseFloat(document.getElementById('encerrar-horas-paradas').value);
+  if (!parada || parada.motivo !== 'Falta de funcionário' || !horas || isNaN(horas)) {
+    box.style.display = 'none';
+    box.textContent = '';
+    return;
+  }
+  const impacto = calcSacosNaoProduzidos(parada.maquina, parada.motivo, horas);
+  if (impacto == null) {
+    box.style.display = 'none';
+    box.textContent = '';
+    return;
+  }
+  box.style.display = '';
+  box.textContent = `Impacto estimado: ${impacto.toLocaleString('pt-BR')} sacos não produzidos`;
 }
 
 function showMsg(action, ok, text) {
@@ -478,6 +523,7 @@ function renderParadaCard(p){
         <div class="reg-card-sub">${dataFmt} · ${escapeHtml(p.turno)}</div>
         <div class="reg-card-sub">Início ${tsToHHMM(p.horaInicioTs)||'–'} · Término ${tsToHHMM(p.horaTerminoTs)||'–'} · ${p.horasParadas!=null?p.horasParadas.toFixed(2)+'h':'–'}</div>
         ${p.motivo === 'Falta de funcionário' ? `<div class="reg-card-sub">Funcionários faltantes: ${p.qtdFuncionariosFaltantes ?? '–'}</div>` : ''}
+        ${(() => { const imp = calcSacosNaoProduzidos(p.maquina, p.motivo, p.horasParadas); return imp != null ? `<div class="reg-card-sub">Sacos não produzidos: ${imp.toLocaleString('pt-BR')}</div>` : ''; })()}
       </div>
       <div style="text-align:right;">
         ${badge}<br><button class="btn-edit" style="margin-top:6px;" onclick="toggleEdit('p','${p.notionId}')">Editar</button>

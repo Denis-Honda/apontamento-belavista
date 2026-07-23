@@ -126,6 +126,7 @@
       <div class="kpi"><div class="val" id="kpi-disp">–</div><div class="lbl">Disponibilidade geral</div></div>
       <div class="kpi"><div class="val" id="kpi-refugo">0</div><div class="lbl">Total refugo (sacos)</div></div>
       <div class="kpi"><div class="val" id="kpi-bags">0</div><div class="lbl">Total bags gerados (un.)</div></div>
+      <div class="kpi"><div class="val" id="kpi-sacos-falta-func">0</div><div class="lbl">Sacos não produzidos (falta de funcionário)</div></div>
     </div>
     <div class="charts-row">
       <div><div class="chart-box"><canvas id="chart-motivo"></canvas></div></div>
@@ -154,6 +155,25 @@ const TURNO_WINDOWS = [
   { nome: "3º Turno", inicio: 22, fim: 6 }
 ];
 const TURNOS = TURNO_WINDOWS.map(t => t.nome);
+// Sacos/hora de referência por máquina, usados para converter horas paradas
+// por "Falta de funcionário" em sacos não produzidos (impacto na meta).
+const TAXA_IMPACTO_FALTA_FUNC = {
+  "Máquina 00": 150,
+  "Máquina 01": 200,
+  "Máquina 02": 450,
+  "Máquina 03": 300,
+  "Máquina 04": 450,
+  "Máquina 05": 300,
+  "Máquina 06": 450,
+};
+function calcSacosNaoProduzidos(p){
+  if (p.motivo !== 'Falta de funcionário') return null;
+  const taxa = TAXA_IMPACTO_FALTA_FUNC[p.maquina];
+  if (!taxa) return null;
+  const horas = horasDaParada(p);
+  if (!horas) return null;
+  return Math.round(horas * taxa);
+}
 let charts = {};
 let ordens = [];
 let paradas = [];
@@ -309,6 +329,8 @@ function renderKpisAndCharts(){
   document.getElementById('kpi-disp').textContent = (tempoRealTotal+totalPa) > 0 ? ((tempoRealTotal/(tempoRealTotal+totalPa))*100).toFixed(1)+'%' : '–';
   document.getElementById('kpi-refugo').textContent = totalRefugo.toLocaleString('pt-BR');
   document.getElementById('kpi-bags').textContent = totalBags.toLocaleString('pt-BR');
+  const totalSacosFaltaFunc = paradas.reduce((s,p)=>s+(calcSacosNaoProduzidos(p)||0),0);
+  document.getElementById('kpi-sacos-falta-func').textContent = totalSacosFaltaFunc.toLocaleString('pt-BR');
 
   const motivoTotals = MOTIVOS.map(m => paradasEncerradas.filter(r=>r.motivo===m).reduce((s,r)=>s+(r.horasParadas||0),0));
   const tempoNecPorMaquina = MAQUINAS.map(m => finalizadas.filter(o=>o.maquina===m).reduce((s,o)=>s+(o.tempoNecessario||0),0));
@@ -367,15 +389,17 @@ function renderHistory(){
   const recs = paradas.slice().sort((a,b)=>b.ts-a.ts);
   const wrap = document.getElementById('hist-wrap');
   if (recs.length === 0){ wrap.innerHTML = '<div class="empty-note">Nenhuma parada registrada ainda.</div>'; return; }
-  let html = '<table class="hist"><thead><tr><th>Data</th><th>Turno</th><th>Máquina</th><th>Motivo</th><th>Início</th><th>Término</th><th>Horas paradas</th><th>Func. Faltantes</th><th>Status</th><th>Obs.</th></tr></thead><tbody>';
+  let html = '<table class="hist"><thead><tr><th>Data</th><th>Turno</th><th>Máquina</th><th>Motivo</th><th>Início</th><th>Término</th><th>Horas paradas</th><th>Func. Faltantes</th><th>Sacos não produzidos</th><th>Status</th><th>Obs.</th></tr></thead><tbody>';
   recs.forEach(r => {
     const dataFmt = r.data ? r.data.split('-').reverse().join('/') : '';
+    const impacto = calcSacosNaoProduzidos(r);
     html += `<tr>
       <td>${dataFmt}</td><td>${r.turno}</td><td>${r.maquina}</td><td>${r.motivo||'–'}</td>
       <td>${hhmm(r.horaInicioTs)}</td>
       <td>${r.horaTerminoTs!=null ? hhmm(r.horaTerminoTs) : '–'}</td>
       <td>${r.horasParadas!=null ? r.horasParadas.toFixed(2)+'h' : '–'}</td>
       <td>${r.motivo === 'Falta de funcionário' ? (r.qtdFuncionariosFaltantes ?? '–') : '–'}</td>
+      <td>${impacto!=null ? impacto.toLocaleString('pt-BR')+' sacos' : '–'}</td>
       <td><span class="badge ${r.status==='Em Aberto'?'live':'pa'}">${r.status}</span></td>
       <td>${r.obs||''}</td>
     </tr>`;
