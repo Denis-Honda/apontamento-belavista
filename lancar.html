@@ -42,6 +42,8 @@
   .msg.ok { background: var(--green-bg); color: var(--green); }
   .msg.err { background: var(--red-bg); color: var(--red); }
   .empty-note { color: var(--text-dim); font-size: 13px; padding: 6px 0; }
+  .field input[readonly] { background: #f2f4f7; color: var(--text-dim); }
+  .field .hint { display: block; font-weight: 400; color: var(--text-dim); font-size: 11px; margin-top: 2px; }
 </style>
 </head>
 <body>
@@ -65,10 +67,15 @@
         <div class="field"><label>Máquina *</label><select name="maquina" required></select></div>
         <div class="field"><label>Turno *</label><select name="turno" required></select></div>
       </div>
-      <div class="field"><label>Produto</label><input type="text" name="produto"></div>
+      <div class="field"><label>Produto *</label><select name="produtoSelect" id="op-produto" required onchange="onProdutoChange()"></select></div>
+      <div class="row2 hidden" id="wrap-produto-novo">
+        <div class="field"><label>Nome do novo produto</label><input type="text" id="op-produto-novo-nome" oninput="updateTempoPreview()"></div>
+        <div class="field"><label>Sacos/Hora (padrão)</label><input type="number" id="op-produto-novo-sh" min="0" step="1" oninput="updateTempoPreview()"></div>
+      </div>
+      <div class="field hidden" id="wrap-produto-novo-setup"><label>Setup (h)</label><input type="number" id="op-produto-novo-setup" min="0" step="0.1" value="0.5" oninput="updateTempoPreview()"></div>
       <div class="row2">
-        <div class="field"><label>Qtd Planejada (sacos)</label><input type="number" name="qtdPlanejada" min="0"></div>
-        <div class="field"><label>Tempo Necessário (h)</label><input type="number" name="tempoNecessario" min="0" step="0.1"></div>
+        <div class="field"><label>Qtd Planejada (sacos)</label><input type="number" name="qtdPlanejada" min="0" oninput="updateTempoPreview()"></div>
+        <div class="field"><label>Tempo Necessário (h)<span class="hint">calculado pelo tempo padrão (sacos/hora)</span></label><input type="number" id="op-tempo-preview" readonly placeholder="–"></div>
       </div>
       <div class="field"><label>Hora Início</label><input type="time" name="horaInicio"></div>
       <div class="field"><label>Observações</label><textarea name="obs"></textarea></div>
@@ -134,6 +141,54 @@ const MAQUINAS = ["Máquina 00","Máquina 01","Máquina 02","Máquina 03","Máqu
 const TURNOS = ["1º Turno","2º Turno","3º Turno"];
 const MOTIVOS = ["Falta de energia","Falta de funcionário","Falta de Matéria-prima","Falta de Mecânico","Falta de Embalagem","Limpeza","Manutenção","Máquina quebrada","Reunião","Saída Médico / Particular","Trator quebrado","Treinamento"];
 
+// Produtos e tempo padrão (sacos/hora + setup) — conforme CAPACIDADE_MÁQUINAS DA PRODUÇÃO
+const PRODUTOS = [
+  ["ARGAMASSA BELACOLA AC-I", 200, 0.5],
+  ["ARGAMASSA BELACOLA AC-II", 200, 0.5],
+  ["ARGAMASSA BELACOLA AC-III", 200, 0.5],
+  ["ARGAMASSA BELACOLA AC-III BRANCA", 200, 0.5],
+  ["REJUNTE FLEX CINZA PLATINA", 200, 0.5],
+  ["REJUNTE FLEX BRANCO", 200, 0.5],
+  ["REJUNTE FLEX OUTONO", 200, 0.5],
+  ["REJUNTE FLEX CINZA CHUMBO", 200, 0.5],
+  ["REJUNTE FLEX CINZA PRATA", 200, 0.5],
+  ["ARGAMASSA BELACOLA PISO SOBRE PISO E PORC. BRANCA", 200, 0.5],
+  ["BELA PLAST 60200", 200, 0.5],
+  ["BELATTO (EM GERAL)", 200, 0.5],
+  ["GROUT SUPERBV 15 FCK", 250, 0.5],
+  ["GROUT SUPERBV 20 FCK", 250, 0.5],
+  ["GROUT SUPERBV 25 FCK", 250, 0.5],
+  ["GROUT SUPERBV 30 FCK", 250, 0.5],
+  ["GROUT SUPERBV 40 FCK", 250, 0.5],
+  ["GROUT SUPERBV 50 FCK", 250, 0.5],
+  ["ARGAMASSA PARA ASSENTAMENTO ESTRUTURAL AAEE-30", 500, 0.5],
+  ["ARGAMASSA PARA ASSENTAMENTO ESTRUTURAL AAEE-24", 500, 0.5],
+  ["ARGAMASSA PARA ASSENTAMENTO ESTRUTURAL AAE20", 500, 0.5],
+  ["ARGAMASSA PARA ASSENTAMENTO ESTRUTURAL AAE16", 500, 0.5],
+  ["ARGAMASSA PARA REVESTIMENTO EXTERNO", 400, 0.5],
+  ["ARGAMASSA PARA REVESTIMENTO EXTERNO COM FIBRA", 400, 0.5],
+  ["ARGAMASSA PARA REVESTIMENTO EXTERNO PROJETADO", 400, 0.5],
+  ["CHAPISCO BV ALVENARIA", 400, 0.5],
+  ["CHAPISCO BV CONCRETO", 400, 0.5],
+  ["CHAPISCO BV ROLADO", 400, 0.5],
+  ["CHAPISCO BV PROJETADO", 400, 0.5],
+  ["ARGAMASSA MULTIPLO USO 20 KG", 500, 0.5],
+  ["ARGAMASSA PARA ASSENTAMENTO ESTRUTURAL AAE12", 500, 0.5],
+  ["ARGAMASSA PARA ASSENTAMENTO ESTRUTURAL AAE8", 500, 0.5],
+  ["ARGAMASSA PARA ASSENTAMENTO ESTRUTURAL AAE5", 500, 0.5],
+  ["ARGAMASSA EMBOCOFLEX INTERNO", 350, 0.5],
+  ["ARGAMASSA EMBOCOFLEX PLUS EXTERNO", 350, 0.5],
+  ["ARGAMASSA EMBOCOFLEX PLUS EXTERNO HIDROFOBICO", 350, 0.5],
+  ["ARGAMASSA BELACOLA PISO SOBRE PISO E PORCELANATO CINZA", 350, 0.5],
+  ["ARGAMASSA MULTIPLO USO 30 KG", 500, 0.5],
+  ["ARGAMASSA PARA ASSENTAMENTO DE VEDACAO E ENC.", 500, 0.5],
+  ["ARGAMASSA PARA CONTRAPISO", 500, 0.5],
+  ["ARGAMASSA PARA REVESTIMENTO INTERNO", 500, 0.5],
+];
+const PRODUTOS_MAP = {};
+PRODUTOS.forEach(p => { PRODUTOS_MAP[p[0]] = { sacosHora: p[1], setup: p[2] }; });
+const NOVO_PRODUTO_VALUE = '__novo__';
+
 function fillSelect(sel, options, placeholder) {
   sel.innerHTML = '';
   if (placeholder) {
@@ -164,6 +219,47 @@ document.querySelectorAll('select[name=turno]').forEach(el => fillSelect(el, TUR
 document.querySelector('#form-iniciar_parada select[name=maquina]').innerHTML = '';
 fillSelect(document.querySelector('#form-iniciar_parada select[name=maquina]'), MAQUINAS, 'Selecione');
 fillSelect(document.querySelector('#form-iniciar_parada select[name=motivo]'), MOTIVOS, 'Selecione');
+
+const selProduto = document.getElementById('op-produto');
+fillSelect(selProduto, PRODUTOS.map(p => p[0]), 'Selecione o produto');
+selProduto.appendChild(new Option('+ Adicionar novo produto...', NOVO_PRODUTO_VALUE));
+
+function onProdutoChange(){
+  const isNovo = selProduto.value === NOVO_PRODUTO_VALUE;
+  document.getElementById('wrap-produto-novo').classList.toggle('hidden', !isNovo);
+  document.getElementById('wrap-produto-novo-setup').classList.toggle('hidden', !isNovo);
+  updateTempoPreview();
+}
+
+function getProdutoAtual(){
+  const sel = selProduto.value;
+  if (sel === NOVO_PRODUTO_VALUE){
+    const nome = document.getElementById('op-produto-novo-nome').value.trim();
+    const sh = parseFloat(document.getElementById('op-produto-novo-sh').value || '');
+    const su = parseFloat(document.getElementById('op-produto-novo-setup').value || '');
+    return { nome: nome || '(novo produto sem nome)', sacosHora: isNaN(sh) ? null : sh, setup: isNaN(su) ? 0 : su };
+  }
+  const info = PRODUTOS_MAP[sel];
+  return info ? { nome: sel, sacosHora: info.sacosHora, setup: info.setup } : { nome: sel || '', sacosHora: null, setup: null };
+}
+
+function calcTempoNecessario(sacosHora, setup, qtd){
+  if (!sacosHora || sacosHora <= 0 || !qtd || qtd <= 0) return null;
+  return (qtd / sacosHora) + (setup || 0);
+}
+
+function updateTempoPreview(){
+  const p = getProdutoAtual();
+  const qtd = parseFloat(document.querySelector('#form-iniciar_ordem input[name=qtdPlanejada]').value || '0');
+  const tempo = calcTempoNecessario(p.sacosHora, p.setup, qtd);
+  const field = document.getElementById('op-tempo-preview');
+  if (tempo === null){
+    field.value = '';
+    field.placeholder = p.sacosHora ? '–' : 'informe sacos/hora do novo produto';
+    return;
+  }
+  field.value = tempo.toFixed(2);
+}
 
 function switchTab(tab) {
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
@@ -233,6 +329,14 @@ async function submitForm(ev, action) {
   const payload = {};
   fd.forEach((v, k) => { payload[k] = v; });
   if (action === 'iniciar_ordem' || action === 'iniciar_parada') payload.data = todayISO();
+  if (action === 'iniciar_ordem') {
+    delete payload.produtoSelect;
+    const p = getProdutoAtual();
+    payload.produto = p.nome;
+    const qtd = parseFloat(payload.qtdPlanejada || '0');
+    const tempo = calcTempoNecessario(p.sacosHora, p.setup, qtd);
+    payload.tempoNecessario = tempo != null ? tempo.toFixed(2) : '';
+  }
   if (action === 'finalizar_ordem') {
     payload.refugo = document.getElementById('refugo-hidden').value === 'true';
     payload.bags = document.getElementById('bags-hidden').value === 'true';
@@ -252,6 +356,11 @@ async function submitForm(ev, action) {
     if (action === 'finalizar_ordem' || action === 'iniciar_ordem') {
       document.getElementById('refugo-qty-wrap')?.classList.add('hidden');
       document.getElementById('bags-qty-wrap')?.classList.add('hidden');
+    }
+    if (action === 'iniciar_ordem') {
+      document.getElementById('wrap-produto-novo').classList.add('hidden');
+      document.getElementById('wrap-produto-novo-setup').classList.add('hidden');
+      document.getElementById('op-tempo-preview').value = '';
     }
     if (action === 'finalizar_ordem' || action === 'encerrar_parada') loadOpenRecords();
   } catch (e) {

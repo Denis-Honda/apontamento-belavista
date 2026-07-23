@@ -58,6 +58,12 @@
   .refresh-note { font-size: 11.5px; color: var(--text-dim); }
   .btn-ghost { background: transparent; border: 1px solid var(--border); border-radius: 6px; padding: 5px 10px; font-size: 12px; cursor: pointer; color: var(--text-dim); }
   .btn-ghost:hover { border-color: var(--primary); color: var(--primary); }
+  .prod-dia { background: linear-gradient(135deg, var(--primary), var(--primary-light)); color: #fff; }
+  .prod-dia-inner { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+  .prod-dia-label { font-size: 13px; font-weight: 700; opacity: 0.92; text-transform: uppercase; letter-spacing: 0.02em; }
+  .prod-dia-sub { font-size: 11.5px; opacity: 0.75; margin-top: 2px; }
+  .prod-dia-val { font-size: 34px; font-weight: 800; line-height: 1; }
+  .prod-dia-unit { font-size: 14px; font-weight: 600; opacity: 0.88; }
 </style>
 </head>
 <body>
@@ -70,6 +76,16 @@
     <div>
       <button class="btn-ghost" onclick="loadData()">↻ Atualizar agora</button>
       <div class="refresh-note" id="last-update">Carregando...</div>
+    </div>
+  </div>
+
+  <div class="panel prod-dia">
+    <div class="prod-dia-inner">
+      <div>
+        <div class="prod-dia-label">Total produzido hoje</div>
+        <div class="prod-dia-sub" id="prod-dia-sub"></div>
+      </div>
+      <div class="prod-dia-val"><span id="kpi-produzido-hoje">0</span> <span class="prod-dia-unit">sacos</span></div>
     </div>
   </div>
 
@@ -206,6 +222,15 @@ function renderStatusGrid(){
   });
 }
 
+function renderProducaoHoje(){
+  const hoje = todayStr();
+  const producaoHoje = ordens
+    .filter(o => o.status === 'Finalizada' && o.data === hoje)
+    .reduce((s,o)=>s+(o.qtdReal||0),0);
+  document.getElementById('kpi-produzido-hoje').textContent = producaoHoje.toLocaleString('pt-BR');
+  document.getElementById('prod-dia-sub').textContent = 'referente a ' + hoje.split('-').reverse().join('/') + ' · soma das ordens finalizadas no dia';
+}
+
 function renderKpisAndCharts(){
   const finalizadas = ordens.filter(o => o.status === 'Finalizada');
   const ativas = ordens.filter(o => o.status === 'Em Produção');
@@ -301,6 +326,7 @@ function renderHistory(){
 }
 
 function renderAll(){
+  renderProducaoHoje();
   renderStatusGrid();
   renderKpisAndCharts();
   renderOrdersHistory();
