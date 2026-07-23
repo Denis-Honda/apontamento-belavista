@@ -169,6 +169,7 @@ export default async (req: Request, context: Context) => {
       if (!p.notionId) throw new Error("notionId da ordem é obrigatório");
       const tempoReal = diffHorasHHMM(p.horaInicio, p.horaTermino);
       const properties: any = {};
+      if (p.data) properties["Data"] = { date: { start: p.data } };
       if (p.horaInicio !== undefined) properties["Hora Início"] = rt(p.horaInicio || "");
       if (p.horaTermino !== undefined) properties["Hora Término"] = rt(p.horaTermino || "");
       if (p.qtdPlanejada !== undefined) properties["Qtd Planejada"] = num(p.qtdPlanejada);
@@ -192,6 +193,7 @@ export default async (req: Request, context: Context) => {
       if (!p.notionId) throw new Error("notionId da parada é obrigatório");
       const horasCalc = diffHorasHHMM(p.horaInicio, p.horaTermino);
       const properties: any = {};
+      if (p.data) properties["Data"] = { date: { start: p.data } };
       if (p.horaInicio !== undefined) properties["Hora Início"] = rt(p.horaInicio || "");
       if (p.horaTermino !== undefined) properties["Hora Término"] = rt(p.horaTermino || "");
       if (p.horaTermino) {
