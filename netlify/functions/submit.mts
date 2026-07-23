@@ -34,6 +34,18 @@ function newLocalId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 }
 
+// Diferença em horas entre dois horários "HH:MM", assumindo que Término
+// pode cair no dia seguinte (turno da noite) — mesma regra do painel principal.
+function diffHorasHHMM(iniStr: string, fimStr: string): number | null {
+  if (!iniStr || !fimStr) return null;
+  const [ih, im] = iniStr.split(":").map(Number);
+  const [fh, fm] = fimStr.split(":").map(Number);
+  if ([ih, im, fh, fm].some((n) => isNaN(n))) return null;
+  let diff = (fh * 60 + fm) - (ih * 60 + im);
+  if (diff < 0) diff += 24 * 60;
+  return diff / 60;
+}
+
 async function notionRequest(path: string, method: string, token: string, body: any) {
   const res = await fetch(`https://api.notion.com${path}`, {
     method,
@@ -119,6 +131,48 @@ export default async (req: Request, context: Context) => {
         "Qtd Bags": num(p.bags ? p.qtdBags : null),
         Status: sel("Finalizada"),
       };
+      if (p.obs !== undefined) properties["Observações"] = rt(p.obs || "");
+      await notionRequest(`/v1/pages/${p.notionId}`, "PATCH", token, { properties });
+      return ok({ notionId: p.notionId });
+    }
+
+    // Correção pós-lançamento: permite ajustar horas e quantidades de uma
+    // ordem já lançada (em produção ou já finalizada), sem depender do status.
+    if (action === "editar_ordem") {
+      const p = payload || {};
+      if (!p.notionId) throw new Error("notionId da ordem é obrigatório");
+      const tempoReal = diffHorasHHMM(p.horaInicio, p.horaTermino);
+      const properties: any = {};
+      if (p.horaInicio !== undefined) properties["Hora Início"] = rt(p.horaInicio || "");
+      if (p.horaTermino !== undefined) properties["Hora Término"] = rt(p.horaTermino || "");
+      if (p.qtdPlanejada !== undefined) properties["Qtd Planejada"] = num(p.qtdPlanejada);
+      if (p.qtdReal !== undefined) properties["Qtd Real"] = num(p.qtdReal);
+      if (p.horaTermino) properties["Tempo Real"] = num(tempoReal);
+      if (p.refugo !== undefined) {
+        properties["Refugo"] = chk(p.refugo);
+        properties["Qtd Refugo"] = num(p.refugo ? p.qtdRefugo : null);
+      }
+      if (p.bags !== undefined) {
+        properties["Bags"] = chk(p.bags);
+        properties["Qtd Bags"] = num(p.bags ? p.qtdBags : null);
+      }
+      if (p.obs !== undefined) properties["Observações"] = rt(p.obs || "");
+      await notionRequest(`/v1/pages/${p.notionId}`, "PATCH", token, { properties });
+      return ok({ notionId: p.notionId });
+    }
+
+    if (action === "editar_parada") {
+      const p = payload || {};
+      if (!p.notionId) throw new Error("notionId da parada é obrigatório");
+      const horasCalc = diffHorasHHMM(p.horaInicio, p.horaTermino);
+      const properties: any = {};
+      if (p.horaInicio !== undefined) properties["Hora Início"] = rt(p.horaInicio || "");
+      if (p.horaTermino !== undefined) properties["Hora Término"] = rt(p.horaTermino || "");
+      if (p.horaTermino) {
+        properties["Horas Paradas"] = num(horasCalc);
+      } else if (p.horasParadas !== undefined) {
+        properties["Horas Paradas"] = num(p.horasParadas);
+      }
       if (p.obs !== undefined) properties["Observações"] = rt(p.obs || "");
       await notionRequest(`/v1/pages/${p.notionId}`, "PATCH", token, { properties });
       return ok({ notionId: p.notionId });
