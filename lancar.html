@@ -116,7 +116,7 @@
         <div class="field"><label>Hora Término</label><input type="time" name="horaTermino" oninput="updateTempoRealPreview()"></div>
         <div class="field"><label>Qtd Real (sacos)</label><input type="number" name="qtdReal" min="0"></div>
       </div>
-      <div class="field"><label>Tempo Real (h)<span class="hint">calculado automaticamente (início → término), pode ajustar se necessário</span></label><input type="number" name="tempoReal" id="finalizar-tempo-real" min="0" step="0.1"></div>
+      <div class="field"><label>Tempo Real (h)<span class="hint">calculado automaticamente (início → término), pode ajustar se necessário</span></label><input type="text" inputmode="decimal" name="tempoReal" id="finalizar-tempo-real" placeholder="0,00"></div>
       <div class="check-row"><input type="checkbox" id="refugo-check" onchange="toggleQty('refugo')"><label for="refugo-check">Houve Refugo</label></div>
       <div class="field qty-inline hidden" id="refugo-qty-wrap"><label>Qtd Refugo (sacos)</label><input type="number" name="qtdRefugo" min="0"></div>
       <input type="hidden" name="refugo" id="refugo-hidden" value="false">
@@ -416,7 +416,7 @@ function updateTempoRealPreview(){
   const horaInicioStr = tsToHHMM(ordem.horaInicioTs);
   const tempo = diffHorasHHMM(horaInicioStr, horaTermino);
   if (tempo != null) {
-    document.getElementById('finalizar-tempo-real').value = tempo.toFixed(2);
+    document.getElementById('finalizar-tempo-real').value = tempo.toFixed(2).replace('.', ',');
   }
 }
 
@@ -469,6 +469,7 @@ async function submitForm(ev, action) {
   if (action === 'finalizar_ordem') {
     payload.refugo = document.getElementById('refugo-hidden').value === 'true';
     payload.bags = document.getElementById('bags-hidden').value === 'true';
+    if (typeof payload.tempoReal === 'string') payload.tempoReal = payload.tempoReal.replace(',', '.');
   }
   if (action === 'iniciar_parada' && payload.motivo !== 'Falta de funcionário') {
     delete payload.qtdFuncionariosFaltantes;
@@ -506,10 +507,12 @@ async function submitForm(ev, action) {
   }
 }
 
+// Sempre exibe o horário de Brasília (UTC-3 fixo), independente do fuso do
+// dispositivo de quem está vendo — para bater com o link de visualização.
 function tsToHHMM(ts){
   if (ts == null) return '';
-  const d = new Date(ts);
-  return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+  const d = new Date(ts - 3 * 3600000);
+  return String(d.getUTCHours()).padStart(2,'0') + ':' + String(d.getUTCMinutes()).padStart(2,'0');
 }
 
 function escapeHtml(s){
