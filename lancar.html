@@ -111,12 +111,12 @@
   <div class="panel tab-panel hidden" id="panel-finalizar_ordem">
     <h2>Finalizar Ordem de Produção</h2>
     <form id="form-finalizar_ordem" onsubmit="return submitForm(event,'finalizar_ordem')">
-      <div class="field"><label>Ordem em produção *</label><select name="notionId" id="select-ordens" required></select></div>
+      <div class="field"><label>Ordem em produção *</label><select name="notionId" id="select-ordens" required onchange="updateTempoRealPreview()"></select></div>
       <div class="row2">
-        <div class="field"><label>Hora Término</label><input type="time" name="horaTermino"></div>
+        <div class="field"><label>Hora Término</label><input type="time" name="horaTermino" oninput="updateTempoRealPreview()"></div>
         <div class="field"><label>Qtd Real (sacos)</label><input type="number" name="qtdReal" min="0"></div>
       </div>
-      <div class="field"><label>Tempo Real (h)</label><input type="number" name="tempoReal" min="0" step="0.1"></div>
+      <div class="field"><label>Tempo Real (h)<span class="hint">calculado automaticamente (início → término), pode ajustar se necessário</span></label><input type="number" name="tempoReal" id="finalizar-tempo-real" min="0" step="0.1"></div>
       <div class="check-row"><input type="checkbox" id="refugo-check" onchange="toggleQty('refugo')"><label for="refugo-check">Houve Refugo</label></div>
       <div class="field qty-inline hidden" id="refugo-qty-wrap"><label>Qtd Refugo (sacos)</label><input type="number" name="qtdRefugo" min="0"></div>
       <input type="hidden" name="refugo" id="refugo-hidden" value="false">
@@ -256,6 +256,19 @@ function calcSacosNaoProduzidos(maquina, motivo, horas){
   return Math.round(horas * taxa);
 }
 let paradasAbertasCache = [];
+let ordensAbertasCache = [];
+
+// Diferença em horas entre dois horários "HH:MM", assumindo que o término
+// pode cair no dia seguinte (turno da noite) — mesma regra usada no backend.
+function diffHorasHHMM(iniStr, fimStr){
+  if (!iniStr || !fimStr) return null;
+  const [ih, im] = iniStr.split(':').map(Number);
+  const [fh, fm] = fimStr.split(':').map(Number);
+  if ([ih, im, fh, fm].some(n => isNaN(n))) return null;
+  let diff = (fh * 60 + fm) - (ih * 60 + im);
+  if (diff < 0) diff += 24 * 60;
+  return diff / 60;
+}
 
 function fillSelect(sel, options, placeholder) {
   sel.innerHTML = '';
@@ -359,6 +372,7 @@ async function loadOpenRecords() {
     const data = await res.json();
     const ordensAbertas = (data.ordens || []).filter(o => o.status === 'Em Produção');
     const paradasAbertas = (data.paradas || []).filter(p => p.status === 'Em Aberto');
+    ordensAbertasCache = ordensAbertas;
     paradasAbertasCache = paradasAbertas;
 
     selOrdens.innerHTML = '';
@@ -389,6 +403,20 @@ async function loadOpenRecords() {
   } catch (e) {
     selOrdens.innerHTML = '<option value="" disabled selected>Erro ao carregar</option>';
     selParadas.innerHTML = '<option value="" disabled selected>Erro ao carregar</option>';
+  }
+}
+
+// Ao finalizar uma ordem, calcula automaticamente o Tempo Real (h) a partir
+// da Hora Início da ordem selecionada e da Hora Término informada.
+function updateTempoRealPreview(){
+  const selId = document.getElementById('select-ordens').value;
+  const ordem = ordensAbertasCache.find(o => o.notionId === selId);
+  const horaTermino = document.querySelector('#form-finalizar_ordem input[name=horaTermino]').value;
+  if (!ordem || !horaTermino) return;
+  const horaInicioStr = tsToHHMM(ordem.horaInicioTs);
+  const tempo = diffHorasHHMM(horaInicioStr, horaTermino);
+  if (tempo != null) {
+    document.getElementById('finalizar-tempo-real').value = tempo.toFixed(2);
   }
 }
 

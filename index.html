@@ -123,6 +123,11 @@
   </div>
 
   <div class="panel">
+    <h2>Demonstrativo Diário <span class="hint">todos os dias do mês vigente</span></h2>
+    <div class="hist-scroll" id="dias-wrap"></div>
+  </div>
+
+  <div class="panel">
     <h2>Acumulado por Mês <span class="hint">comparação entre meses</span></h2>
     <div class="hist-scroll" id="meses-wrap"></div>
   </div>
@@ -196,7 +201,12 @@ let ordens = [];
 let paradas = [];
 let metas = [];
 
-function todayStr(){ return new Date().toISOString().slice(0,10); }
+// Horário de Brasília é fixo em UTC-3 (sem horário de verão desde 2019).
+// Usamos isso em vez do fuso do dispositivo de quem está vendo o painel, para
+// que a data e o turno "atual" sempre reflitam o horário da fábrica, não o
+// do navegador de quem estiver olhando o link em outro fuso.
+function nowBrasilia(){ return new Date(Date.now() - 3 * 3600000); }
+function todayStr(){ return nowBrasilia().toISOString().slice(0,10); }
 function hhmm(ts){ return ts ? new Date(ts).toTimeString().slice(0,5) : ''; }
 function diffHoras(iniTs, fimTs){
   if (iniTs == null || fimTs == null) return null;
@@ -211,7 +221,7 @@ function fmtDur(hours){
   return (h>0? h+'h ':'') + m + 'min';
 }
 function getCurrentTurno(){
-  const h = new Date().getHours();
+  const h = nowBrasilia().getUTCHours();
   for (const t of TURNO_WINDOWS){
     if (t.inicio < t.fim){ if (h >= t.inicio && h < t.fim) return t.nome; }
     else { if (h >= t.inicio || h < t.fim) return t.nome; }
@@ -356,6 +366,56 @@ function renderProducaoMensal(){
   wrap.innerHTML = html;
 }
 
+// Demonstrativo dia a dia do mês vigente (todos os dias, mesmo os futuros
+// ainda sem lançamento) — apoia o total mensal com o detalhe diário.
+function renderDemonstrativoMensal(){
+  const hoje = todayStr();
+  const [anoStr, mesStr] = hoje.split('-');
+  const diasNoMes = new Date(parseInt(anoStr,10), parseInt(mesStr,10), 0).getDate();
+  const finalizadas = ordens.filter(o => o.status === 'Finalizada');
+
+  const porDia = {};
+  finalizadas.forEach(o => {
+    if (!o.data || monthKey(o.data) !== monthKey(hoje)) return;
+    if (!porDia[o.data]) porDia[o.data] = { produzido: 0, refugo: 0, bags: 0 };
+    porDia[o.data].produzido += (o.qtdReal || 0);
+    porDia[o.data].refugo += (o.refugo ? (o.qtdRefugo || 0) : 0);
+    porDia[o.data].bags += (o.bags ? (o.qtdBags || 0) : 0);
+  });
+  const metaPorDia = {};
+  metas.forEach(m => {
+    if (!m.data || monthKey(m.data) !== monthKey(hoje)) return;
+    metaPorDia[m.data] = (metaPorDia[m.data] || 0) + (m.meta || 0);
+  });
+
+  let html = '<table class="hist"><thead><tr><th>Dia</th><th>Sacos produzidos</th><th>Refugo</th><th>Bags</th><th>Meta do dia</th><th>% Atingido</th></tr></thead><tbody>';
+  for (let dia = 1; dia <= diasNoMes; dia++){
+    const dataStr = `${anoStr}-${mesStr}-${String(dia).padStart(2,'0')}`;
+    const isFuturo = dataStr > hoje;
+    const isHoje = dataStr === hoje;
+    const d = porDia[dataStr];
+    const produzido = d ? d.produzido : 0;
+    const refugo = d ? d.refugo : 0;
+    const bags = d ? d.bags : 0;
+    const metaDia = metaPorDia[dataStr] || 0;
+    let pctHtml = '–';
+    if (metaDia > 0 && !isFuturo){
+      const pct = (produzido / metaDia) * 100;
+      pctHtml = `<span style="font-weight:700;color:${pct >= 100 ? 'var(--green)' : 'var(--red)'}">${pct.toFixed(1)}%</span>`;
+    }
+    html += `<tr${isFuturo ? ' style="opacity:0.45;"' : ''}>
+      <td>${String(dia).padStart(2,'0')}/${mesStr}${isHoje ? ' <span class="badge live">hoje</span>' : ''}</td>
+      <td>${isFuturo && !d ? '–' : produzido.toLocaleString('pt-BR')}</td>
+      <td>${isFuturo && !d ? '–' : refugo.toLocaleString('pt-BR')}</td>
+      <td>${isFuturo && !d ? '–' : bags.toLocaleString('pt-BR')}</td>
+      <td>${metaDia ? metaDia.toLocaleString('pt-BR') : '–'}</td>
+      <td>${pctHtml}</td>
+    </tr>`;
+  }
+  html += '</tbody></table>';
+  document.getElementById('dias-wrap').innerHTML = html;
+}
+
 function renderProducaoPorTurno(){
   const hoje = todayStr();
   const finalizadasHoje = ordens.filter(o => o.status === 'Finalizada' && o.data === hoje);
@@ -483,6 +543,7 @@ function renderHistory(){
 function renderAll(){
   renderProducaoHoje();
   renderProducaoMensal();
+  renderDemonstrativoMensal();
   renderProducaoPorTurno();
   renderStatusGrid();
   renderKpisAndCharts();
