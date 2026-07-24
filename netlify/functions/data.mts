@@ -34,13 +34,18 @@ function getDate(prop: any): string | null {
   return prop && prop.date ? prop.date.start : null;
 }
 
-// Notion stores plain "HH:MM" text; convert to a same-day timestamp so the
-// public page can reuse the same diffHoras/hhmm helpers as the main panel.
+// Notion stores plain "HH:MM" text representing horário de Brasília
+// (UTC-3, fixo — sem horário de verão desde 2019). A função Netlify roda em
+// UTC, então interpretar a string sem fuso a trataria como se já fosse UTC,
+// deixando o timestamp 3h adiantado/atrasado em relação ao horário real
+// digitado. Por isso forçamos a leitura como UTC e depois somamos 3h para
+// obter o instante UTC correto — assim os horários batem entre o lançamento
+// e a visualização, não importa o fuso do dispositivo de quem estiver vendo.
 function toTsFromDateAndTime(dateStr: string | null, timeStr: string): number | null {
   if (!dateStr || !timeStr) return null;
-  const d = new Date(`${dateStr}T${timeStr}:00`);
+  const d = new Date(`${dateStr}T${timeStr}:00Z`);
   const t = d.getTime();
-  return isNaN(t) ? null : t;
+  return isNaN(t) ? null : t + 3 * 3600000;
 }
 
 async function queryDataSource(dsId: string, token: string) {
