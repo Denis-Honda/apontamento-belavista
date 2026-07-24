@@ -151,9 +151,9 @@
   <div class="panel tab-panel hidden" id="panel-encerrar_parada">
     <h2>Encerrar Parada</h2>
     <form id="form-encerrar_parada" onsubmit="return submitForm(event,'encerrar_parada')">
-      <div class="field"><label>Parada em aberto *</label><select name="notionId" id="select-paradas" required onchange="updateImpactoPreview()"></select></div>
-      <div class="field"><label>Hora Término</label><input type="time" name="horaTermino"></div>
-      <div class="field"><label>Horas Paradas</label><input type="number" name="horasParadas" id="encerrar-horas-paradas" min="0" step="0.1" oninput="updateImpactoPreview()"></div>
+      <div class="field"><label>Parada em aberto *</label><select name="notionId" id="select-paradas" required onchange="updateHorasParadasAuto(); updateImpactoPreview();"></select></div>
+      <div class="field"><label>Hora Término</label><input type="time" name="horaTermino" oninput="updateHorasParadasAuto(); updateImpactoPreview();"></div>
+      <div class="field"><label>Horas Paradas<span class="hint">calculado automaticamente (início → término), pode ajustar se necessário</span></label><input type="text" inputmode="decimal" name="horasParadas" id="encerrar-horas-paradas" placeholder="0,00" oninput="updateImpactoPreview()"></div>
       <div class="field hint" id="impacto-preview" style="display:none;font-size:12.5px;color:var(--red);font-weight:600;margin-top:-8px;"></div>
       <div class="field"><label>Observações</label><textarea name="obs"></textarea></div>
       <button class="submit" type="submit">Encerrar Parada</button>
@@ -420,6 +420,20 @@ function updateTempoRealPreview(){
   }
 }
 
+// Ao encerrar uma parada, calcula automaticamente as Horas Paradas a partir
+// da Hora Início da parada selecionada e da Hora Término informada.
+function updateHorasParadasAuto(){
+  const sel = document.getElementById('select-paradas');
+  const parada = paradasAbertasCache.find(p => p.notionId === sel.value);
+  const horaTermino = document.querySelector('#form-encerrar_parada input[name=horaTermino]').value;
+  if (!parada || !horaTermino) return;
+  const horaInicioStr = tsToHHMM(parada.horaInicioTs);
+  const horas = diffHorasHHMM(horaInicioStr, horaTermino);
+  if (horas != null) {
+    document.getElementById('encerrar-horas-paradas').value = horas.toFixed(2).replace('.', ',');
+  }
+}
+
 // Preview em tempo real, no formulário de Encerrar Parada, do impacto em
 // sacos não produzidos quando o motivo da parada é "Falta de funcionário".
 function updateImpactoPreview() {
@@ -428,7 +442,7 @@ function updateImpactoPreview() {
   if (!sel || !box) return;
   const notionId = sel.value;
   const parada = paradasAbertasCache.find(p => p.notionId === notionId);
-  const horas = parseFloat(document.getElementById('encerrar-horas-paradas').value);
+  const horas = parseFloat(document.getElementById('encerrar-horas-paradas').value.replace(',', '.'));
   if (!parada || parada.motivo !== 'Falta de funcionário' || !horas || isNaN(horas)) {
     box.style.display = 'none';
     box.textContent = '';
@@ -458,6 +472,7 @@ async function submitForm(ev, action) {
   const payload = {};
   fd.forEach((v, k) => { payload[k] = v; });
   if ((action === 'iniciar_ordem' || action === 'iniciar_parada') && !payload.data) payload.data = todayISO();
+  if (action === 'encerrar_parada' && typeof payload.horasParadas === 'string') payload.horasParadas = payload.horasParadas.replace(',', '.');
   if (action === 'iniciar_ordem') {
     delete payload.produtoSelect;
     const p = getProdutoAtual();
