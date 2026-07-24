@@ -77,6 +77,14 @@
   .prod-dia-meta { font-size: 12px; opacity: 0.85; margin-top: 4px; }
   .prod-dia-meta .hit { color: #d7ffe9; font-weight: 700; }
   .prod-dia-meta .miss { color: #ffdcd9; font-weight: 700; }
+  .oee-badge { display: inline-block; padding: 3px 12px; border-radius: 10px; font-weight: 700; font-size: 15px; }
+  .oee-badge.great { background: var(--green-bg); color: var(--green); }
+  .oee-badge.ok { background: var(--amber-bg); color: var(--amber); }
+  .oee-badge.bad { background: var(--red-bg); color: var(--red); }
+  .pareto-list { list-style: none; margin: 0; padding: 0; }
+  .pareto-list li { padding: 7px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+  .pareto-list li:last-child { border-bottom: none; }
+  .pareto-bar { height: 6px; border-radius: 3px; background: var(--red); margin-top: 5px; }
 </style>
 </head>
 <body>
@@ -110,6 +118,21 @@
     <div class="turno-grid" id="turno-grid"></div>
   </div>
 
+  <div class="panel">
+    <h2>Relatório Executivo <span class="hint" id="relatorio-periodo">semana atual</span></h2>
+    <div class="kpi-row">
+      <div class="kpi"><div class="val" id="rel-oee">–</div><div class="lbl">OEE médio da semana</div></div>
+      <div class="kpi"><div class="val" id="rel-produzido">0</div><div class="lbl">Produzido na semana (sacos)</div></div>
+      <div class="kpi"><div class="val" id="rel-meta-pct">–</div><div class="lbl">% da meta semanal atingida</div></div>
+      <div class="kpi"><div class="val" id="rel-refugo">0</div><div class="lbl">Refugo na semana (sacos)</div></div>
+      <div class="kpi"><div class="val" id="rel-falta-func">0</div><div class="lbl">Sacos não produzidos (falta de func.)</div></div>
+    </div>
+    <div style="margin-top:14px;">
+      <div style="font-weight:700;font-size:13px;color:var(--primary);margin-bottom:8px;">Principais motivos de parada na semana</div>
+      <ul class="pareto-list" id="rel-pareto"></ul>
+    </div>
+  </div>
+
   <div class="panel prod-dia">
     <div class="prod-dia-inner">
       <div>
@@ -133,8 +156,24 @@
   </div>
 
   <div class="panel">
+    <h2>Comparativo Ano a Ano <span class="hint">mesmo mês em anos diferentes</span></h2>
+    <div class="hist-scroll" id="anual-wrap"></div>
+  </div>
+
+  <div class="panel">
     <h2>Status atual das máquinas <span id="status-data-label" class="hint"></span></h2>
     <div class="machine-grid" id="machine-grid"></div>
+  </div>
+
+  <div class="panel">
+    <h2>OEE — Eficiência Global do Equipamento <span class="hint">referente a hoje</span></h2>
+    <div class="kpi-row">
+      <div class="kpi"><div class="val" id="oee-geral">–</div><div class="lbl">OEE geral</div></div>
+      <div class="kpi"><div class="val" id="oee-disp">–</div><div class="lbl">Disponibilidade</div></div>
+      <div class="kpi"><div class="val" id="oee-perf">–</div><div class="lbl">Performance</div></div>
+      <div class="kpi"><div class="val" id="oee-qual">–</div><div class="lbl">Qualidade</div></div>
+    </div>
+    <div class="hist-scroll" id="oee-maquinas-wrap"></div>
   </div>
 
   <div class="panel">
@@ -372,6 +411,162 @@ function renderProducaoMensal(){
   wrap.innerHTML = html;
 }
 
+// --- OEE (Eficiência Global do Equipamento) --------------------------------
+// OEE = Disponibilidade x Performance x Qualidade.
+// Disponibilidade = tempo operando / (tempo operando + tempo parado)
+// Performance     = tempo padrão (necessário) / tempo operando, limitado a 100%
+// Qualidade       = (produzido - refugo) / produzido
+function calcOEE(ordensSubset, paradasSubset){
+  const finalizadas = ordensSubset.filter(o => o.status === 'Finalizada');
+  const tempoOperando = finalizadas.reduce((s,o)=>s+(o.tempoReal||0),0);
+  const tempoPadrao = finalizadas.reduce((s,o)=>s+(o.tempoNecessario||0),0);
+  const qtdTotal = finalizadas.reduce((s,o)=>s+(o.qtdReal||0),0);
+  const qtdRefugoTotal = finalizadas.reduce((s,o)=>s+(o.refugo?(o.qtdRefugo||0):0),0);
+  const tempoParado = paradasSubset.filter(p => p.status === 'Encerrada').reduce((s,p)=>s+(p.horasParadas||0),0);
+  const tempoPlanejado = tempoOperando + tempoParado;
+
+  const disponibilidade = tempoPlanejado > 0 ? tempoOperando / tempoPlanejado : null;
+  const performance = (tempoOperando > 0 && tempoPadrao > 0) ? Math.min(1, tempoPadrao / tempoOperando) : null;
+  const qualidade = qtdTotal > 0 ? Math.max(0, (qtdTotal - qtdRefugoTotal) / qtdTotal) : null;
+  const oee = (disponibilidade != null && performance != null && qualidade != null)
+    ? disponibilidade * performance * qualidade : null;
+
+  return { disponibilidade, performance, qualidade, oee, tempoOperando, tempoParado };
+}
+function fmtPct(v){ return v == null ? '–' : (v * 100).toFixed(1) + '%'; }
+function oeeClasse(v){
+  if (v == null) return '';
+  if (v >= 0.85) return 'great';
+  if (v >= 0.60) return 'ok';
+  return 'bad';
+}
+
+function renderOEE(){
+  const hoje = todayStr();
+  const ordensHoje = ordens.filter(o => o.data === hoje);
+  const paradasHoje = paradas.filter(p => p.data === hoje);
+  const geral = calcOEE(ordensHoje, paradasHoje);
+
+  document.getElementById('oee-geral').innerHTML = geral.oee != null ? `<span class="oee-badge ${oeeClasse(geral.oee)}">${fmtPct(geral.oee)}</span>` : '–';
+  document.getElementById('oee-disp').textContent = fmtPct(geral.disponibilidade);
+  document.getElementById('oee-perf').textContent = fmtPct(geral.performance);
+  document.getElementById('oee-qual').textContent = fmtPct(geral.qualidade);
+
+  const linhas = MAQUINAS.map(m => ({
+    maquina: m,
+    ...calcOEE(ordensHoje.filter(o => o.maquina === m), paradasHoje.filter(p => p.maquina === m))
+  })).filter(r => r.oee != null || r.disponibilidade != null);
+
+  const wrap = document.getElementById('oee-maquinas-wrap');
+  if (!linhas.length){
+    wrap.innerHTML = '<div class="empty-note">Nenhum dado de produção hoje ainda.</div>';
+    return;
+  }
+  let html = '<table class="hist"><thead><tr><th>Máquina</th><th>OEE</th><th>Disponibilidade</th><th>Performance</th><th>Qualidade</th></tr></thead><tbody>';
+  linhas.forEach(r => {
+    html += `<tr>
+      <td>${r.maquina}</td>
+      <td>${r.oee != null ? `<span class="oee-badge ${oeeClasse(r.oee)}">${fmtPct(r.oee)}</span>` : '–'}</td>
+      <td>${fmtPct(r.disponibilidade)}</td>
+      <td>${fmtPct(r.performance)}</td>
+      <td>${fmtPct(r.qualidade)}</td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+}
+
+// --- Relatório Executivo (semana atual, sempre em dia) ---------------------
+// Segunda-feira da semana ISO correspondente a uma data "YYYY-MM-DD".
+function inicioSemana(dataStr){
+  const [y, m, d] = dataStr.split('-').map(Number);
+  const date = new Date(Date.UTC(y, m - 1, d));
+  const dow = date.getUTCDay(); // 0=domingo..6=sábado
+  const diff = (dow === 0) ? -6 : (1 - dow);
+  date.setUTCDate(date.getUTCDate() + diff);
+  return date.toISOString().slice(0, 10);
+}
+
+function renderRelatorioExecutivo(){
+  const hoje = todayStr();
+  const inicio = inicioSemana(hoje);
+  const ordensSemana = ordens.filter(o => o.data && o.data >= inicio && o.data <= hoje);
+  const paradasSemana = paradas.filter(p => p.data && p.data >= inicio && p.data <= hoje);
+
+  const oee = calcOEE(ordensSemana, paradasSemana);
+  const finalizadasSemana = ordensSemana.filter(o => o.status === 'Finalizada');
+  const produzido = finalizadasSemana.reduce((s,o)=>s+(o.qtdReal||0),0);
+  const refugo = finalizadasSemana.reduce((s,o)=>s+(o.refugo?(o.qtdRefugo||0):0),0);
+  const metaSemana = metas.filter(m => m.data && m.data >= inicio && m.data <= hoje).reduce((s,m)=>s+(m.meta||0),0);
+  const faltaFunc = paradasSemana.reduce((s,p)=>s+(calcSacosNaoProduzidos(p)||0),0);
+
+  document.getElementById('relatorio-periodo').textContent =
+    'semana de ' + inicio.split('-').reverse().join('/') + ' a ' + hoje.split('-').reverse().join('/');
+  document.getElementById('rel-oee').innerHTML = oee.oee != null ? `<span class="oee-badge ${oeeClasse(oee.oee)}">${fmtPct(oee.oee)}</span>` : '–';
+  document.getElementById('rel-produzido').textContent = produzido.toLocaleString('pt-BR');
+  document.getElementById('rel-meta-pct').innerHTML = metaSemana > 0
+    ? (() => { const pct = (produzido / metaSemana) * 100; return `<span style="color:${pct >= 100 ? 'var(--green)' : 'var(--red)'}">${pct.toFixed(1)}%</span>`; })()
+    : '–';
+  document.getElementById('rel-refugo').textContent = refugo.toLocaleString('pt-BR');
+  document.getElementById('rel-falta-func').textContent = faltaFunc.toLocaleString('pt-BR');
+
+  const porMotivo = {};
+  paradasSemana.forEach(p => {
+    if (!p.motivo) return;
+    porMotivo[p.motivo] = (porMotivo[p.motivo] || 0) + horasDaParada(p);
+  });
+  const ranking = Object.entries(porMotivo).sort((a,b)=>b[1]-a[1]).slice(0, 5);
+  const maxHoras = ranking.length ? ranking[0][1] : 0;
+  const ul = document.getElementById('rel-pareto');
+  if (!ranking.length){
+    ul.innerHTML = '<li style="color:var(--text-dim);border-bottom:none;">Nenhuma parada registrada na semana.</li>';
+  } else {
+    ul.innerHTML = ranking.map(([motivo, horas]) => `
+      <li>
+        <div style="display:flex;justify-content:space-between;"><span>${motivo}</span><span style="font-weight:700;">${horas.toFixed(1)}h</span></div>
+        <div class="pareto-bar" style="width:${maxHoras > 0 ? (horas / maxHoras * 100) : 0}%;"></div>
+      </li>`).join('');
+  }
+}
+
+// --- Comparativo Ano a Ano --------------------------------------------------
+function renderComparativoAnual(){
+  const finalizadas = ordens.filter(o => o.status === 'Finalizada');
+  const porAnoMes = {};
+  finalizadas.forEach(o => {
+    if (!o.data) return;
+    const key = o.data.slice(0, 7); // YYYY-MM
+    porAnoMes[key] = (porAnoMes[key] || 0) + (o.qtdReal || 0);
+  });
+  const anos = [...new Set(Object.keys(porAnoMes).map(k => k.slice(0, 4)))].sort();
+  const nomesMes = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+
+  const wrap = document.getElementById('anual-wrap');
+  if (!anos.length){
+    wrap.innerHTML = '<div class="empty-note">Nenhum registro finalizado ainda.</div>';
+    return;
+  }
+  const temVariacao = anos.length >= 2;
+  let html = '<table class="hist"><thead><tr><th>Mês</th>' + anos.map(a => `<th>${a}</th>`).join('') + (temVariacao ? `<th>Variação (${anos[anos.length-1]} vs ${anos[anos.length-2]})</th>` : '') + '</tr></thead><tbody>';
+  for (let m = 1; m <= 12; m++){
+    const mm = String(m).padStart(2, '0');
+    const vals = anos.map(a => porAnoMes[`${a}-${mm}`] || 0);
+    if (!vals.some(v => v > 0)) continue;
+    let variacaoHtml = '–';
+    if (temVariacao){
+      const atual = vals[vals.length - 1];
+      const anterior = vals[vals.length - 2];
+      if (anterior > 0){
+        const pct = ((atual - anterior) / anterior) * 100;
+        variacaoHtml = `<span style="font-weight:700;color:${pct >= 0 ? 'var(--green)' : 'var(--red)'}">${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%</span>`;
+      }
+    }
+    html += `<tr><td>${nomesMes[m-1]}</td>${vals.map(v => `<td>${v ? v.toLocaleString('pt-BR') : '–'}</td>`).join('')}${temVariacao ? `<td>${variacaoHtml}</td>` : ''}</tr>`;
+  }
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+}
+
 // Demonstrativo dia a dia do mês vigente (todos os dias, mesmo os futuros
 // ainda sem lançamento) — apoia o total mensal com o detalhe diário.
 function renderDemonstrativoMensal(){
@@ -555,10 +750,13 @@ function renderHistory(){
 
 function renderAll(){
   renderProducaoHoje();
+  renderRelatorioExecutivo();
   renderProducaoMensal();
   renderDemonstrativoMensal();
+  renderComparativoAnual();
   renderProducaoPorTurno();
   renderStatusGrid();
+  renderOEE();
   renderKpisAndCharts();
   renderOrdersHistory();
   renderHistory();
