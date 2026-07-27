@@ -238,9 +238,9 @@ const PRODUTOS_MAP = {};
 PRODUTOS.forEach(p => { PRODUTOS_MAP[p[0]] = { sacosHora: p[1], setup: p[2] }; });
 const NOVO_PRODUTO_VALUE = '__novo__';
 
-// Sacos/hora de referência por máquina, para converter horas paradas por
-// "Falta de funcionário" em sacos não produzidos (mesma tabela da visualização).
-const TAXA_IMPACTO_FALTA_FUNC = {
+// Sacos/hora de referência por máquina, para converter qualquer hora parada
+// (independente do motivo) em sacos não produzidos (mesma tabela da visualização).
+const TAXA_SACOS_HORA = {
   "Máquina 00": 150,
   "Máquina 01": 200,
   "Máquina 02": 450,
@@ -249,9 +249,8 @@ const TAXA_IMPACTO_FALTA_FUNC = {
   "Máquina 05": 300,
   "Máquina 06": 450,
 };
-function calcSacosNaoProduzidos(maquina, motivo, horas){
-  if (motivo !== 'Falta de funcionário') return null;
-  const taxa = TAXA_IMPACTO_FALTA_FUNC[maquina];
+function calcSacosNaoProduzidos(maquina, horas){
+  const taxa = TAXA_SACOS_HORA[maquina];
   if (!taxa || !horas) return null;
   return Math.round(horas * taxa);
 }
@@ -435,7 +434,7 @@ function updateHorasParadasAuto(){
 }
 
 // Preview em tempo real, no formulário de Encerrar Parada, do impacto em
-// sacos não produzidos quando o motivo da parada é "Falta de funcionário".
+// sacos não produzidos — vale para qualquer motivo de parada.
 function updateImpactoPreview() {
   const sel = document.getElementById('select-paradas');
   const box = document.getElementById('impacto-preview');
@@ -443,12 +442,12 @@ function updateImpactoPreview() {
   const notionId = sel.value;
   const parada = paradasAbertasCache.find(p => p.notionId === notionId);
   const horas = parseFloat(document.getElementById('encerrar-horas-paradas').value.replace(',', '.'));
-  if (!parada || parada.motivo !== 'Falta de funcionário' || !horas || isNaN(horas)) {
+  if (!parada || !horas || isNaN(horas)) {
     box.style.display = 'none';
     box.textContent = '';
     return;
   }
-  const impacto = calcSacosNaoProduzidos(parada.maquina, parada.motivo, horas);
+  const impacto = calcSacosNaoProduzidos(parada.maquina, horas);
   if (impacto == null) {
     box.style.display = 'none';
     box.textContent = '';
@@ -574,7 +573,7 @@ function renderParadaCard(p){
         <div class="reg-card-sub">${dataFmt} · ${escapeHtml(p.turno)}</div>
         <div class="reg-card-sub">Início ${tsToHHMM(p.horaInicioTs)||'–'} · Término ${tsToHHMM(p.horaTerminoTs)||'–'} · ${p.horasParadas!=null?p.horasParadas.toFixed(2)+'h':'–'}</div>
         ${p.motivo === 'Falta de funcionário' ? `<div class="reg-card-sub">Funcionários faltantes: ${p.qtdFuncionariosFaltantes ?? '–'}</div>` : ''}
-        ${(() => { const imp = calcSacosNaoProduzidos(p.maquina, p.motivo, p.horasParadas); return imp != null ? `<div class="reg-card-sub">Sacos não produzidos: ${imp.toLocaleString('pt-BR')}</div>` : ''; })()}
+        ${(() => { const imp = calcSacosNaoProduzidos(p.maquina, p.horasParadas); return imp != null ? `<div class="reg-card-sub">Sacos não produzidos: ${imp.toLocaleString('pt-BR')}</div>` : ''; })()}
       </div>
       <div style="text-align:right;">
         ${badge}<br><button class="btn-edit" style="margin-top:6px;" onclick="toggleEdit('p','${p.notionId}')">Editar</button>

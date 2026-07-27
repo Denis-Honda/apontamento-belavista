@@ -125,7 +125,7 @@
       <div class="kpi"><div class="val" id="rel-produzido">0</div><div class="lbl">Produzido na semana (sacos)</div></div>
       <div class="kpi"><div class="val" id="rel-meta-pct">–</div><div class="lbl">% da meta semanal atingida</div></div>
       <div class="kpi"><div class="val" id="rel-refugo">0</div><div class="lbl">Refugo na semana (sacos)</div></div>
-      <div class="kpi"><div class="val" id="rel-falta-func">0</div><div class="lbl">Sacos não produzidos (falta de func.)</div></div>
+      <div class="kpi"><div class="val" id="rel-falta-func">0</div><div class="lbl">Sacos não produzidos (paradas)</div></div>
     </div>
     <div style="margin-top:14px;">
       <div style="font-weight:700;font-size:13px;color:var(--primary);margin-bottom:8px;">Principais motivos de parada na semana</div>
@@ -187,7 +187,7 @@
       <div class="kpi"><div class="val" id="kpi-disp">–</div><div class="lbl">Disponibilidade geral</div></div>
       <div class="kpi"><div class="val" id="kpi-refugo">0</div><div class="lbl">Total refugo (sacos)</div></div>
       <div class="kpi"><div class="val" id="kpi-bags">0</div><div class="lbl">Total bags gerados (un.)</div></div>
-      <div class="kpi"><div class="val" id="kpi-sacos-falta-func">0</div><div class="lbl">Sacos não produzidos (falta de funcionário)</div></div>
+      <div class="kpi"><div class="val" id="kpi-sacos-falta-func">0</div><div class="lbl">Sacos não produzidos (paradas)</div></div>
     </div>
     <div class="charts-row">
       <div><div class="chart-box"><canvas id="chart-motivo"></canvas></div></div>
@@ -216,9 +216,9 @@ const TURNO_WINDOWS = [
   { nome: "3º Turno", inicio: 22, fim: 6 }
 ];
 const TURNOS = TURNO_WINDOWS.map(t => t.nome);
-// Sacos/hora de referência por máquina, usados para converter horas paradas
-// por "Falta de funcionário" em sacos não produzidos (impacto na meta).
-const TAXA_IMPACTO_FALTA_FUNC = {
+// Sacos/hora de referência por máquina, usados para converter qualquer hora
+// parada (independente do motivo) em sacos não produzidos (impacto na meta).
+const TAXA_SACOS_HORA = {
   "Máquina 00": 150,
   "Máquina 01": 200,
   "Máquina 02": 450,
@@ -228,8 +228,7 @@ const TAXA_IMPACTO_FALTA_FUNC = {
   "Máquina 06": 450,
 };
 function calcSacosNaoProduzidos(p){
-  if (p.motivo !== 'Falta de funcionário') return null;
-  const taxa = TAXA_IMPACTO_FALTA_FUNC[p.maquina];
+  const taxa = TAXA_SACOS_HORA[p.maquina];
   if (!taxa) return null;
   const horas = horasDaParada(p);
   if (!horas) return null;
