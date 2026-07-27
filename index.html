@@ -22,7 +22,7 @@
   .panel h2 { font-size: 15px; margin: 0 0 14px; color: var(--primary); }
   .panel h2 .hint { font-weight: 400; color: var(--text-dim); font-size: 11.5px; }
   .machine-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
-  @media (max-width: 900px) { .machine-grid { grid-template-columns: repeat(2, 1fr); } .charts-row { grid-template-columns: 1fr !important; } }
+  @media (max-width: 900px) { .machine-grid { grid-template-columns: repeat(2, 1fr); } .charts-row { grid-template-columns: 1fr !important; } .maquina-prod-grid { grid-template-columns: 1fr !important; } }
   @media (max-width: 520px) { .machine-grid { grid-template-columns: 1fr; } }
   .m-card { border-radius: 8px; padding: 12px 14px; border: 1px solid var(--border); }
   .m-card.op { background: var(--green-bg); border-color: #bfe8d3; }
@@ -148,6 +148,20 @@
   <div class="panel">
     <h2>Demonstrativo Diário <span class="hint">todos os dias do mês vigente, com quantidades por turno</span></h2>
     <div class="hist-scroll" id="dias-wrap"></div>
+  </div>
+
+  <div class="panel">
+    <h2>Produção por Máquina <span class="hint">diária (hoje) e mensal (mês vigente)</span></h2>
+    <div class="maquina-prod-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+      <div>
+        <div style="font-weight:700;font-size:13px;color:var(--primary);margin-bottom:8px;">Hoje</div>
+        <div class="hist-scroll" id="maquina-dia-wrap"></div>
+      </div>
+      <div>
+        <div style="font-weight:700;font-size:13px;color:var(--primary);margin-bottom:8px;">Mês vigente</div>
+        <div class="hist-scroll" id="maquina-mes-wrap"></div>
+      </div>
+    </div>
   </div>
 
   <div class="panel">
@@ -623,6 +637,41 @@ function renderDemonstrativoMensal(){
   document.getElementById('dias-wrap').innerHTML = html;
 }
 
+// Produção diária (hoje) e mensal (mês vigente) agrupada por máquina —
+// mesma métrica das outras seções, só que quebrada por máquina em vez de
+// por turno ou por mês, para facilitar comparar o desempenho entre elas.
+function renderProducaoPorMaquina(){
+  const hoje = todayStr();
+  const mesAtual = monthKey(hoje);
+  const finalizadas = ordens.filter(o => o.status === 'Finalizada');
+
+  function tabela(subset){
+    let any = false;
+    let html = '<table class="hist"><thead><tr><th>Máquina</th><th>Sacos produzidos</th><th>Refugo</th><th>Bags</th><th>Ordens finalizadas</th></tr></thead><tbody>';
+    MAQUINAS.forEach(m => {
+      const s = subset.filter(o => o.maquina === m);
+      if (s.length) any = true;
+      const produzido = s.reduce((a,o)=>a+(o.qtdReal||0),0);
+      const refugo = s.reduce((a,o)=>a+(o.refugo?(o.qtdRefugo||0):0),0);
+      const bags = s.reduce((a,o)=>a+(o.bags?(o.qtdBags||0):0),0);
+      html += `<tr>
+        <td>${m}</td>
+        <td>${produzido.toLocaleString('pt-BR')}</td>
+        <td>${refugo.toLocaleString('pt-BR')}</td>
+        <td>${bags.toLocaleString('pt-BR')}</td>
+        <td>${s.length}</td>
+      </tr>`;
+    });
+    html += '</tbody></table>';
+    return { html, any };
+  }
+
+  const diaRes = tabela(finalizadas.filter(o => o.data === hoje));
+  const mesRes = tabela(finalizadas.filter(o => monthKey(o.data) === mesAtual));
+  document.getElementById('maquina-dia-wrap').innerHTML = diaRes.any ? diaRes.html : '<div class="empty-note">Nenhuma ordem finalizada hoje ainda.</div>';
+  document.getElementById('maquina-mes-wrap').innerHTML = mesRes.any ? mesRes.html : '<div class="empty-note">Nenhuma ordem finalizada no mês ainda.</div>';
+}
+
 function renderProducaoPorTurno(){
   const hoje = todayStr();
   const finalizadasHoje = ordens.filter(o => o.status === 'Finalizada' && o.data === hoje);
@@ -752,6 +801,7 @@ function renderAll(){
   renderRelatorioExecutivo();
   renderProducaoMensal();
   renderDemonstrativoMensal();
+  renderProducaoPorMaquina();
   renderComparativoAnual();
   renderProducaoPorTurno();
   renderStatusGrid();
