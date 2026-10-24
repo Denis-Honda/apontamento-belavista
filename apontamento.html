@@ -137,7 +137,7 @@ $('dia').onchange=()=>{$('p-data').value=$('dia').value;render()};
 $('hoje').onclick=()=>{$('dia').value=hojeStr();$('p-data').value=hojeStr();render()};
 $('atualizar').onclick=carregar;
 function exportarExcel(){
-  const dia=$('dia').value,its=prog.filter(x=>x.data===dia).sort((a,b)=>a.maquina.localeCompare(b.maquina)||(a.inicioPrevisto||'').localeCompare(b.inicioPrevisto||'')),ps=par.filter(x=>x.data===dia);
+  const dia=$('dia').value,its=prog.filter(x=>x.data===dia).sort((a,b)=>a.maquina.localeCompare(b.maquina)||(a.inicioPrevisto||'').localeCompare(b.inicioPrevisto||'')),ps=paradas.filter(x=>x.data===dia);
   if(typeof XLSX==='undefined'){alert('Biblioteca de Excel não carregou. Verifique a conexão e tente novamente.');return}
   const d=fmtD(dia);
   const a=[['Data','Máquina','Produto','Nº OP','Qtd planejada (sacos)','Qtd realizada (sacos)','Diferença','% realizado','Início previsto','Término previsto','Início real','Término real','Secagem (min)','Status']];
