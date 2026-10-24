@@ -26,7 +26,16 @@ button.sec{background:#e9edf4;color:var(--tx)}button.ok{background:var(--ok)}but
 .maq h3{margin:0 0 8px;font-size:15px}
 .item{border-top:1px solid var(--bd);padding:10px 0}.item:first-of-type{border-top:0}
 .item .t{font-weight:700}.item .s{color:var(--dim);font-size:13px;margin-top:2px}
+
+#lock{position:fixed;inset:0;background:var(--pri);display:flex;align-items:center;justify-content:center;z-index:99;padding:16px}
+#lock form{background:#fff;border-radius:14px;padding:24px;width:100%;max-width:340px}
+#lock h2{margin:0 0 6px;color:var(--pri)}#lock p{margin:0 0 14px;color:var(--dim);font-size:14px}
+#lock .e{color:var(--bad);font-weight:600;margin-top:8px;min-height:20px;font-size:14px}
+.sair{background:rgba(255,255,255,.14);color:#fff}
 </style></head><body>
+<div id="lock"><form id="lockf"><h2>🔒 Acesso PCP</h2><p>Digite a senha para editar as informações.</p>
+<input type="password" id="lockpw" placeholder="Senha" autocomplete="current-password" autofocus><div class="row" style="margin-top:12px"><button type="submit">Entrar</button><a href="/dashboard.html" style="color:var(--dim);font-size:14px">Ver dashboard</a></div><div class="e" id="locke"></div></form></div>
+
 <header><h1>Usina Bela Vista Argamassas · Programação PCP</h1>
 <nav><a class="on" href="/programacao.html">Programação (PCP)</a><a href="/apontamento.html">Apontamento</a><a href="/dashboard.html">Dashboard</a></nav></header>
 <main>
@@ -51,6 +60,17 @@ button.sec{background:#e9edf4;color:var(--tx)}button.ok{background:var(--ok)}but
 <div id="lista"></div></div>
 </main>
 <script>
+
+const PAPEL="pcp";
+let SENHA=sessionStorage.getItem('bv-senha-pcp')||'';
+function travar(msg){SENHA='';sessionStorage.removeItem('bv-senha-pcp');document.getElementById('lock').style.display='flex';document.getElementById('locke').textContent=msg||'';}
+async function entrar(s){
+  const r=await fetch('/api/prog-submit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'login',payload:{papel:PAPEL},senha:s})});
+  if(!r.ok)return false;SENHA=s;sessionStorage.setItem('bv-senha-pcp',s);document.getElementById('lock').style.display='none';return true;
+}
+document.getElementById('lockf').addEventListener('submit',async ev=>{ev.preventDefault();const s=document.getElementById('lockpw').value;
+  document.getElementById('locke').textContent='';if(!(await entrar(s)))document.getElementById('locke').textContent='Senha incorreta.';document.getElementById('lockpw').value=''});
+if(SENHA)entrar(SENHA).then(ok=>{if(!ok)travar('')});
 const MAQUINAS=["Máquina 00","Máquina 01","Máquina 02","Máquina 03","Máquina 04","Máquina 05","Máquina 06"];
 const PRODUTOS = [
   ["ARGAMASSA BELACOLA AC-I", 200, 0.5],
@@ -116,8 +136,8 @@ function sugerirFim(){
 $('fim').addEventListener('input',()=>{fimManual=true});
 
 async function api(action,payload){
-  const r=await fetch('/api/prog-submit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,payload})});
-  const j=await r.json();if(!r.ok||j.error)throw new Error(j.error||'Erro');return j;
+  const r=await fetch('/api/prog-submit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,payload,senha:SENHA})});
+  const j=await r.json();if(r.status===401){travar('Sessão expirada. Digite a senha novamente.');throw new Error('Senha necessária')}if(!r.ok||j.error)throw new Error(j.error||'Erro');return j;
 }
 async function carregar(){
   try{const r=await fetch('/api/prog-data',{cache:'no-store'});const j=await r.json();if(j.error)throw new Error(j.error);dados=j.programacao||[];render()}

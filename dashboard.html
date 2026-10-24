@@ -37,7 +37,7 @@ button.sec{background:#e9edf4;color:var(--tx)}button.ok{background:var(--ok)}but
 .mc h3{margin:0 0 6px;font-size:15px;display:flex;justify-content:space-between;align-items:center}
 .mc .p{font-weight:700;font-size:13px}.mc .s{font-size:12.5px;color:var(--dim);margin-top:3px}
 .bar{height:8px;background:#e9edf4;border-radius:4px;margin-top:8px;overflow:hidden}.bar i{display:block;height:100%;background:var(--ok)}
-.late{color:var(--bad);font-weight:700}
+.rsw{margin-top:10px;padding-top:8px;border-top:1px dashed var(--bd)}.rs{font-size:12px;color:var(--tx);margin-top:2px}.rl{color:var(--dim);margin-top:1px}.late{color:var(--bad);font-weight:700}
 table{width:100%;border-collapse:collapse;font-size:14px}th{text-align:left;color:var(--dim);font-size:12px;text-transform:uppercase;padding:6px}td{padding:8px 6px;border-top:1px solid var(--bd)}
 .scroll{overflow-x:auto}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:16px}@media(max-width:800px){.two{grid-template-columns:1fr}}
@@ -76,6 +76,17 @@ async function carregar(){
   catch(e){$('upd').textContent='Falha ao atualizar'}
 }
 function kpi(v,l,c){return `<div class="kpi ${c||''}"><div class="v">${v}</div><div class="l">${l}</div></div>`}
+
+function resumoMaquina(m,dia,ativoId){
+  const todos=prog.filter(x=>x.maquina===m);
+  const k=x=>(x.data||'')+' '+(x.inicioPrevisto||'00:00');
+  const ant=todos.filter(x=>x.status==='Concluído'&&k(x)<=dia+' 99:99').sort((a,b)=>k(b).localeCompare(k(a)))[0];
+  const prox=todos.filter(x=>x.status==='Não iniciado'&&x.data>=dia&&x.id!==ativoId).sort((a,b)=>k(a).localeCompare(k(b))).slice(0,3);
+  let h='';
+  h+='<div class="rs"><b>Anterior:</b> '+(ant?`${ant.produto} — ${fmtN(ant.qtdProduzida)} sacos${ant.data!==dia?' ('+fmtD(ant.data).slice(0,5)+')':''}`:'–')+'</div>';
+  h+='<div class="rs"><b>Próximas:</b> '+(prox.length?'':'–')+'</div>'+prox.map(x=>`<div class="rs rl">• ${x.produto} — ${fmtN(x.qtdProgramada)}${x.data!==dia?' ('+fmtD(x.data).slice(0,5)+')':''}</div>`).join('');
+  return '<div class="rsw">'+h+'</div>';
+}
 function render(){
   const dia=$('dia').value,eHoje=dia===hojeStr();
   $('titulo').textContent=(eHoje?'Panorama de hoje · ':'Panorama de ')+fmtD(dia);
@@ -99,22 +110,22 @@ function render(){
     const ativo=l.find(x=>x.status==='Em andamento');
     const parM=ps.filter(x=>x.maquina===m).reduce((s,x)=>s+(x.horasParadas||0),0);
     const parTxt=parM>0?`<div class="s">Paradas no dia: ${fmtH(parM)}</div>`:'';
-    if(!l.length)return `<div class="mc"><h3>${m}<span class="badge b-ni">Sem programação</span></h3>${parTxt}</div>`;
+    if(!l.length)return `<div class="mc"><h3>${m}<span class="badge b-ni">Sem programação</span></h3>${parTxt}${resumoMaquina(m,dia,null)}</div>`;
     const pm=l.reduce((s,x)=>s+(x.qtdProgramada||0),0),pr=l.filter(x=>x.status==='Concluído').reduce((s,x)=>s+(x.qtdProduzida||0),0);
     const pct=Math.min(100,pm?pr/pm*100:0);
     const bar=`<div class="bar"><i style="width:${pct}%"></i></div><div class="s">${fmtN(pr)} de ${fmtN(pm)} sacos (${l.filter(x=>x.status==='Concluído').length}/${l.length} ordens)</div>`;
     if(ativo){
       const f=toMin(ativo.terminoPrevisto),atr=eHoje&&f!=null&&agora>f;
       return `<div class="mc prod"><h3>${m}<span class="badge b-ea">Em produção</span></h3><div class="p">${ativo.produto}</div>
-      <div class="s">${fmtN(ativo.qtdProgramada)} sacos · início ${ativo.inicioReal||'--:--'} · previsto até ${ativo.terminoPrevisto||'--:--'}${atr?' <span class="late">· atrasada</span>':''}</div>${bar}${parTxt}</div>`;
+      <div class="s">${fmtN(ativo.qtdProgramada)} sacos · início ${ativo.inicioReal||'--:--'} · previsto até ${ativo.terminoPrevisto||'--:--'}${atr?' <span class="late">· atrasada</span>':''}</div>${bar}${parTxt}${resumoMaquina(m,dia,ativo.id)}</div>`;
     }
     const prox=l.find(x=>x.status==='Não iniciado');
     if(prox){
       const i=toMin(prox.inicioPrevisto),atr=eHoje&&i!=null&&agora>i;
       return `<div class="mc wait"><h3>${m}<span class="badge b-ni">Aguardando</span></h3><div class="p">Próxima: ${prox.produto}</div>
-      <div class="s">${fmtN(prox.qtdProgramada)} sacos · previsto ${prox.inicioPrevisto||'--:--'}${atr?' <span class="late">· início atrasado</span>':''}</div>${bar}${parTxt}</div>`;
+      <div class="s">${fmtN(prox.qtdProgramada)} sacos · previsto ${prox.inicioPrevisto||'--:--'}${atr?' <span class="late">· início atrasado</span>':''}</div>${bar}${parTxt}${resumoMaquina(m,dia,prox.id)}</div>`;
     }
-    return `<div class="mc done"><h3>${m}<span class="badge b-co">Concluído</span></h3><div class="p">Programação do dia finalizada</div>${bar}${parTxt}</div>`;
+    return `<div class="mc done"><h3>${m}<span class="badge b-co">Concluído</span></h3><div class="p">Programação do dia finalizada</div>${bar}${parTxt}${resumoMaquina(m,dia,null)}</div>`;
   }).join('');
   // tabela
   const ord=its.slice().sort((a,b)=>(a.inicioPrevisto||'').localeCompare(b.inicioPrevisto||'')||a.maquina.localeCompare(b.maquina));

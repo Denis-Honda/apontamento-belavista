@@ -26,12 +26,21 @@ button.sec{background:#e9edf4;color:var(--tx)}button.ok{background:var(--ok)}but
 .maq h3{margin:0 0 8px;font-size:15px}
 .item{border-top:1px solid var(--bd);padding:10px 0}.item:first-of-type{border-top:0}
 .item .t{font-weight:700}.item .s{color:var(--dim);font-size:13px;margin-top:2px}
-</style></head><body>
+
+#lock{position:fixed;inset:0;background:var(--pri);display:flex;align-items:center;justify-content:center;z-index:99;padding:16px}
+#lock form{background:#fff;border-radius:14px;padding:24px;width:100%;max-width:340px}
+#lock h2{margin:0 0 6px;color:var(--pri)}#lock p{margin:0 0 14px;color:var(--dim);font-size:14px}
+#lock .e{color:var(--bad);font-weight:600;margin-top:8px;min-height:20px;font-size:14px}
+.sair{background:rgba(255,255,255,.14);color:#fff}
+</style><script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script></head><body>
+<div id="lock"><form id="lockf"><h2>🔒 Acesso Apontamento</h2><p>Digite a senha para editar as informações.</p>
+<input type="password" id="lockpw" placeholder="Senha" autocomplete="current-password" autofocus><div class="row" style="margin-top:12px"><button type="submit">Entrar</button><a href="/dashboard.html" style="color:var(--dim);font-size:14px">Ver dashboard</a></div><div class="e" id="locke"></div></form></div>
+
 <header><h1>Usina Bela Vista Argamassas · Apontamento</h1>
 <nav><a href="/programacao.html">Programação (PCP)</a><a class="on" href="/apontamento.html">Apontamento</a><a href="/dashboard.html">Dashboard</a></nav></header>
 <main>
 <div class="card"><div class="row" style="justify-content:space-between"><h2 style="margin:0">Programação do dia</h2>
-<div class="row"><input type="date" id="dia" style="width:auto"><button class="sec sm" id="hoje">Hoje</button><button class="sec sm" id="atualizar">↻ Atualizar</button></div></div>
+<div class="row"><input type="date" id="dia" style="width:auto"><button class="sec sm" id="hoje">Hoje</button><button class="sec sm" id="atualizar">↻ Atualizar</button><button class="ok sm" id="excel">⬇ Exportar Excel do dia</button></div></div>
 <div id="resumo" style="color:var(--dim);margin:8px 0 12px"></div><div id="lista"></div><div id="msg" class="msg"></div></div>
 
 <div class="card"><h2>Horas paradas</h2>
@@ -47,6 +56,17 @@ button.sec{background:#e9edf4;color:var(--tx)}button.ok{background:var(--ok)}but
 <h2 style="margin-top:20px">Paradas do dia</h2><div id="paradas"></div></div>
 </main>
 <script>
+
+const PAPEL="apontador";
+let SENHA=sessionStorage.getItem('bv-senha-apontador')||'';
+function travar(msg){SENHA='';sessionStorage.removeItem('bv-senha-apontador');document.getElementById('lock').style.display='flex';document.getElementById('locke').textContent=msg||'';}
+async function entrar(s){
+  const r=await fetch('/api/prog-submit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'login',payload:{papel:PAPEL},senha:s})});
+  if(!r.ok)return false;SENHA=s;sessionStorage.setItem('bv-senha-apontador',s);document.getElementById('lock').style.display='none';return true;
+}
+document.getElementById('lockf').addEventListener('submit',async ev=>{ev.preventDefault();const s=document.getElementById('lockpw').value;
+  document.getElementById('locke').textContent='';if(!(await entrar(s)))document.getElementById('locke').textContent='Senha incorreta.';document.getElementById('lockpw').value=''});
+if(SENHA)entrar(SENHA).then(ok=>{if(!ok)travar('')});
 const MAQUINAS=["Máquina 00","Máquina 01","Máquina 02","Máquina 03","Máquina 04","Máquina 05","Máquina 06"];
 const MOTIVOS=["Falta de energia","Falta de funcionário","Falta de Matéria-prima","Falta de Mecânico","Falta de Embalagem","Limpeza","Manutenção","Máquina quebrada","Reunião","Saída Médico / Particular","Sem demanda","Trator quebrado","Treinamento"];
 let prog=[],paradas=[];
@@ -61,8 +81,8 @@ function fill(sel,arr,ph){sel.innerHTML=`<option value="">${ph}</option>`+arr.ma
 fill($('p-maq'),MAQUINAS,'Selecione');fill($('p-motivo'),MOTIVOS,'Selecione');
 $('dia').value=hojeStr();$('p-data').value=hojeStr();
 async function api(action,payload){
-  const r=await fetch('/api/prog-submit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,payload})});
-  const j=await r.json();if(!r.ok||j.error)throw new Error(j.error||'Erro');return j;
+  const r=await fetch('/api/prog-submit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,payload,senha:SENHA})});
+  const j=await r.json();if(r.status===401){travar('Sessão expirada. Digite a senha novamente.');throw new Error('Senha necessária')}if(!r.ok||j.error)throw new Error(j.error||'Erro');return j;
 }
 async function carregar(){
   try{const r=await fetch('/api/prog-data',{cache:'no-store'});const j=await r.json();if(j.error)throw new Error(j.error);
@@ -116,5 +136,26 @@ $('fp').addEventListener('submit',async ev=>{
 $('dia').onchange=()=>{$('p-data').value=$('dia').value;render()};
 $('hoje').onclick=()=>{$('dia').value=hojeStr();$('p-data').value=hojeStr();render()};
 $('atualizar').onclick=carregar;
+function exportarExcel(){
+  const dia=$('dia').value,its=prog.filter(x=>x.data===dia).sort((a,b)=>a.maquina.localeCompare(b.maquina)||(a.inicioPrevisto||'').localeCompare(b.inicioPrevisto||'')),ps=par.filter(x=>x.data===dia);
+  if(typeof XLSX==='undefined'){alert('Biblioteca de Excel não carregou. Verifique a conexão e tente novamente.');return}
+  const d=fmtD(dia);
+  const a=[['Data','Máquina','Produto','Nº OP','Qtd planejada (sacos)','Qtd realizada (sacos)','Diferença','% realizado','Início previsto','Término previsto','Início real','Término real','Secagem (min)','Status']];
+  let tp=0,tr=0;
+  its.forEach(x=>{const pl=x.qtdProgramada||0,re=x.status==='Concluído'?(x.qtdProduzida||0):0;tp+=pl;tr+=re;
+    a.push([d,x.maquina,x.produto,x.opNumero||'',pl,x.status==='Concluído'?re:'',x.status==='Concluído'?re-pl:'',x.status==='Concluído'&&pl?re/pl:'',x.inicioPrevisto||'',x.terminoPrevisto||'',x.inicioReal||'',x.terminoReal||'',x.secagemMin??'',x.status])});
+  a.push([]);a.push(['TOTAL','','','',tp,tr,tr-tp,tp?tr/tp:'']);
+  const h=[['Data','Máquina','Motivo','Início','Término','Horas paradas','Observações']];let th=0;
+  ps.forEach(x=>{th+=x.horasParadas||0;h.push([d,x.maquina,x.motivo||'',x.horaInicio||'',x.horaTermino||'',x.horasParadas==null?'':x.horasParadas,x.obs||''])});
+  h.push([]);h.push(['TOTAL','','','','',Math.round(th*100)/100,'']);
+  const wb=XLSX.utils.book_new(),w1=XLSX.utils.aoa_to_sheet(a),w2=XLSX.utils.aoa_to_sheet(h);
+  w1['!cols']=[{wch:11},{wch:13},{wch:46},{wch:10},{wch:14},{wch:14},{wch:10},{wch:11},{wch:10},{wch:10},{wch:10},{wch:10},{wch:10},{wch:14}];
+  w2['!cols']=[{wch:11},{wch:13},{wch:26},{wch:8},{wch:8},{wch:12},{wch:30}];
+  for(let r=1;r<=a.length;r++){const c=w1['H'+r];if(c&&typeof c.v==='number')c.z='0.0%'}
+  XLSX.utils.book_append_sheet(wb,w1,'Planejado x Realizado');XLSX.utils.book_append_sheet(wb,w2,'Horas paradas');
+  XLSX.writeFile(wb,'apontamento_'+dia+'.xlsx');
+}
+$('excel').onclick=exportarExcel;
+
 carregar();
 </script></body></html>
