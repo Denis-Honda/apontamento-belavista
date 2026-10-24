@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Programação PCP — Bela Vista</title>
+<style>:root{--bg:#f3f5f9;--card:#fff;--bd:#e1e5ec;--tx:#1d2433;--dim:#6b7385;--pri:#16467a;--pri2:#2468b0;--ok:#16915a;--okbg:#e6f6ee;--warn:#b7791f;--warnbg:#fdf3dc;--bad:#c8372d;--badbg:#fdeceb}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.4 "Segoe UI",Arial,sans-serif}
+header{background:var(--pri);color:#fff;padding:14px 18px;display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between}
+header h1{margin:0;font-size:18px}nav{display:flex;gap:6px}
+nav a{color:#fff;text-decoration:none;padding:8px 14px;border-radius:8px;background:rgba(255,255,255,.14);font-weight:600;font-size:14px}
+nav a.on{background:#fff;color:var(--pri)}
+main{max-width:1100px;margin:0 auto;padding:16px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:16px;margin-bottom:16px}
+.card h2{margin:0 0 12px;font-size:16px;color:var(--pri)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+label{display:block;font-size:12px;font-weight:600;color:var(--dim);margin-bottom:4px}
+input,select,textarea{width:100%;padding:10px;border:1px solid var(--bd);border-radius:8px;font:inherit;background:#fff}
+input:focus,select:focus{outline:2px solid var(--pri2);border-color:var(--pri2)}
+button{font:inherit;font-weight:700;border:0;border-radius:8px;padding:10px 16px;cursor:pointer;background:var(--pri);color:#fff}
+button.sec{background:#e9edf4;color:var(--tx)}button.ok{background:var(--ok)}button.bad{background:var(--bad)}button.sm{padding:6px 10px;font-size:13px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.badge{display:inline-block;padding:3px 10px;border-radius:99px;font-size:12px;font-weight:700}
+.b-ni{background:#e9edf4;color:var(--dim)}.b-ea{background:var(--warnbg);color:var(--warn)}.b-co{background:var(--okbg);color:var(--ok)}
+.msg{padding:10px 12px;border-radius:8px;margin-top:10px;font-weight:600;display:none}
+.msg.ok{display:block;background:var(--okbg);color:var(--ok)}.msg.err{display:block;background:var(--badbg);color:var(--bad)}
+.empty{color:var(--dim);padding:8px 0}
+.maq{border:1px solid var(--bd);border-radius:10px;padding:12px;margin-bottom:12px}
+.maq h3{margin:0 0 8px;font-size:15px}
+.item{border-top:1px solid var(--bd);padding:10px 0}.item:first-of-type{border-top:0}
+.item .t{font-weight:700}.item .s{color:var(--dim);font-size:13px;margin-top:2px}
+</style></head><body>
+<header><h1>Usina Bela Vista Argamassas · Programação PCP</h1>
+<nav><a class="on" href="/programacao.html">Programação (PCP)</a><a href="/apontamento.html">Apontamento</a></nav></header>
+<main>
+<div class="card"><h2 id="form-title">Nova programação</h2>
+<form id="f" autocomplete="off">
+<div class="grid">
+<div><label>Data *</label><input type="date" id="data" required></div>
+<div><label>Máquina *</label><select id="maquina" required></select></div>
+<div style="grid-column:span 2"><label>Produto *</label><select id="produto" required></select></div>
+<div><label>Qtd de sacos a produzir *</label><input type="number" id="qtd" min="1" inputmode="numeric" required></div>
+<div><label>Início previsto *</label><input type="time" id="ini" required></div>
+<div><label>Término previsto *</label><input type="time" id="fim" required></div>
+<div><label>Tempo de secagem (min)</label><input type="number" id="seca" min="0" inputmode="numeric" placeholder="0"></div>
+</div>
+<div class="row" style="margin-top:12px"><button type="submit" id="btn-save">Programar</button><button type="button" class="sec" id="btn-cancel" style="display:none">Cancelar edição</button></div>
+<div id="msg" class="msg"></div>
+</form></div>
+
+<div class="card"><div class="row" style="justify-content:space-between"><h2 style="margin:0">Programação do dia</h2>
+<div class="row"><label style="margin:0">Dia</label><input type="date" id="dia" style="width:auto"><button class="sec sm" id="hoje">Hoje</button></div></div>
+<div id="resumo" class="s" style="color:var(--dim);margin:8px 0 12px"></div>
+<div id="lista"></div></div>
+</main>
+<script>
+const MAQUINAS=["Máquina 00","Máquina 01","Máquina 02","Máquina 03","Máquina 04","Máquina 05","Máquina 06"];
+const PRODUTOS = [
+  ["ARGAMASSA BELACOLA AC-I", 200, 0.5],
+  ["ARGAMASSA BELACOLA AC-II", 200, 0.5],
+  ["ARGAMASSA BELACOLA AC-III", 200, 0.5],
+  ["ARGAMASSA BELACOLA AC-III BRANCA", 200, 0.5],
+  ["REJUNTE FLEX CINZA PLATINA", 200, 0.5],
+  ["REJUNTE FLEX BRANCO", 200, 0.5],
+  ["REJUNTE FLEX OUTONO", 200, 0.5],
+  ["REJUNTE FLEX CINZA CHUMBO", 200, 0.5],
+  ["REJUNTE FLEX CINZA PRATA", 200, 0.5],
+  ["ARGAMASSA BELACOLA PISO SOBRE PISO E PORC. BRANCA", 200, 0.5],
+  ["BELA PLAST 60200", 200, 0.5],
+  ["BELATTO (EM GERAL)", 200, 0.5],
+  ["GROUT SUPERBV 15 FCK", 250, 0.5],
+  ["GROUT SUPERBV 20 FCK", 250, 0.5],
+  ["GROUT SUPERBV 25 FCK", 250, 0.5],
+  ["GROUT SUPERBV 30 FCK", 250, 0.5],
+  ["GROUT SUPERBV 40 FCK", 250, 0.5],
+  ["GROUT SUPERBV 50 FCK", 250, 0.5],
+  ["ARGAMASSA PARA ASSENTAMENTO ESTRUTURAL AAEE-30", 500, 0.5],
+  ["ARGAMASSA PARA ASSENTAMENTO ESTRUTURAL AAEE-24", 500, 0.5],
+  ["ARGAMASSA PARA ASSENTAMENTO ESTRUTURAL AAE20", 500, 0.5],
+  ["ARGAMASSA PARA ASSENTAMENTO ESTRUTURAL AAE16", 500, 0.5],
+  ["ARGAMASSA PARA REVESTIMENTO EXTERNO", 400, 0.5],
+  ["ARGAMASSA PARA REVESTIMENTO EXTERNO COM FIBRA", 400, 0.5],
+  ["ARGAMASSA PARA REVESTIMENTO EXTERNO PROJETADO", 400, 0.5],
+  ["CHAPISCO BV ALVENARIA", 400, 0.5],
+  ["CHAPISCO BV CONCRETO", 400, 0.5],
+  ["CHAPISCO BV ROLADO", 400, 0.5],
+  ["CHAPISCO BV PROJETADO", 400, 0.5],
+  ["ARGAMASSA MULTIPLO USO 20 KG", 500, 0.5],
+  ["ARGAMASSA PARA ASSENTAMENTO ESTRUTURAL AAE12", 500, 0.5],
+  ["ARGAMASSA PARA ASSENTAMENTO ESTRUTURAL AAE8", 500, 0.5],
+  ["ARGAMASSA PARA ASSENTAMENTO ESTRUTURAL AAE5", 500, 0.5],
+  ["ARGAMASSA EMBOCOFLEX INTERNO", 350, 0.5],
+  ["ARGAMASSA EMBOCOFLEX PLUS EXTERNO", 350, 0.5],
+  ["ARGAMASSA EMBOCOFLEX PLUS EXTERNO HIDROFOBICO", 350, 0.5],
+  ["ARGAMASSA BELACOLA PISO SOBRE PISO E PORCELANATO CINZA", 350, 0.5],
+  ["ARGAMASSA MULTIPLO USO 30 KG", 500, 0.5],
+  ["ARGAMASSA PARA ASSENTAMENTO DE VEDACAO E ENC.", 500, 0.5],
+  ["ARGAMASSA PARA CONTRAPISO", 500, 0.5],
+  ["ARGAMASSA PARA REVESTIMENTO INTERNO", 500, 0.5],
+];
+
+const RATE={};PRODUTOS.forEach(p=>RATE[p[0]]=p[1]);
+let dados=[],editId=null,fimManual=false;
+const $=id=>document.getElementById(id);
+const hojeStr=()=>new Date(Date.now()-3*3600000).toISOString().slice(0,10);
+const fmtD=d=>d?d.split('-').reverse().join('/'):'';
+const fmtN=n=>n==null?'–':Number(n).toLocaleString('pt-BR');
+function msg(t,ok){const m=$('msg');m.textContent=t;m.className='msg '+(ok?'ok':'err');setTimeout(()=>{m.className='msg'},5000)}
+function fill(sel,arr,ph){sel.innerHTML=(ph?`<option value="">${ph}</option>`:'')+arr.map(a=>`<option>${a}</option>`).join('')}
+fill($('maquina'),MAQUINAS,'Selecione');fill($('produto'),PRODUTOS.map(p=>p[0]),'Selecione o produto');
+$('data').value=hojeStr();$('dia').value=hojeStr();
+
+function sugerirFim(){
+  if(fimManual)return;const r=RATE[$('produto').value],q=+$('qtd').value,i=$('ini').value;
+  if(!r||!q||!i)return;const [h,m]=i.split(':').map(Number);let t=h*60+m+Math.round(q/r*60);t%=1440;
+  $('fim').value=String(Math.floor(t/60)).padStart(2,'0')+':'+String(t%60).padStart(2,'0');
+}
+['produto','qtd','ini'].forEach(id=>$(id).addEventListener('input',sugerirFim));
+$('fim').addEventListener('input',()=>{fimManual=true});
+
+async function api(action,payload){
+  const r=await fetch('/api/prog-submit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,payload})});
+  const j=await r.json();if(!r.ok||j.error)throw new Error(j.error||'Erro');return j;
+}
+async function carregar(){
+  try{const r=await fetch('/api/prog-data',{cache:'no-store'});const j=await r.json();if(j.error)throw new Error(j.error);dados=j.programacao||[];render()}
+  catch(e){$('lista').innerHTML='<div class="empty">Falha ao carregar: '+e.message+'</div>'}
+}
+function render(){
+  const dia=$('dia').value,itens=dados.filter(x=>x.data===dia);
+  const tot=itens.reduce((s,x)=>s+(x.qtdProgramada||0),0);
+  $('resumo').textContent=`${fmtD(dia)} · ${itens.length} programação(ões) · ${fmtN(tot)} sacos programados`;
+  $('lista').innerHTML=MAQUINAS.map(m=>{
+    const its=itens.filter(x=>x.maquina===m).sort((a,b)=>(a.inicioPrevisto||'').localeCompare(b.inicioPrevisto||''));
+    return `<div class="maq"><h3>${m}</h3>`+(its.length?its.map(x=>`<div class="item"><div class="row" style="justify-content:space-between"><div><div class="t">${x.produto} — ${fmtN(x.qtdProgramada)} sacos</div>
+    <div class="s">${x.inicioPrevisto||'--:--'} às ${x.terminoPrevisto||'--:--'} · secagem ${x.secagemMin??0} min${x.opNumero?' · OP '+x.opNumero:''}</div></div>
+    <div class="row"><span class="badge ${x.status==='Concluído'?'b-co':x.status==='Em andamento'?'b-ea':'b-ni'}">${x.status}</span>
+    <button class="sec sm" onclick="editar('${x.id}')">Editar</button>
+    ${x.status==='Não iniciado'?`<button class="bad sm" onclick="excluir('${x.id}')">Excluir</button>`:''}</div></div></div>`).join(''):'<div class="empty">Nada programado.</div>')+'</div>';
+  }).join('');
+}
+function editar(id){
+  const x=dados.find(d=>d.id===id);if(!x)return;editId=id;fimManual=true;
+  $('data').value=x.data;$('maquina').value=x.maquina;$('produto').value=x.produto;$('qtd').value=x.qtdProgramada;
+  $('ini').value=x.inicioPrevisto;$('fim').value=x.terminoPrevisto;$('seca').value=x.secagemMin??'';
+  $('form-title').textContent='Editando programação';$('btn-save').textContent='Salvar alterações';$('btn-cancel').style.display='';
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+function limpar(){editId=null;fimManual=false;$('f').reset();$('data').value=$('dia').value;$('form-title').textContent='Nova programação';$('btn-save').textContent='Programar';$('btn-cancel').style.display='none'}
+$('btn-cancel').onclick=limpar;
+async function excluir(id){if(!confirm('Excluir esta programação?'))return;try{await api('excluir_programacao',{id});await carregar()}catch(e){alert(e.message)}}
+$('f').addEventListener('submit',async ev=>{
+  ev.preventDefault();const b=$('btn-save');b.disabled=true;
+  const p={data:$('data').value,maquina:$('maquina').value,produto:$('produto').value,qtdProgramada:+$('qtd').value,
+    inicioPrevisto:$('ini').value,terminoPrevisto:$('fim').value,secagemMin:$('seca').value===''?0:+$('seca').value};
+  try{
+    if(editId){p.id=editId;await api('editar_programacao',p)}else await api('programar',p);
+    const dia=p.data;msg(editId?'Programação atualizada.':'Programação salva.',true);limpar();$('dia').value=dia;$('data').value=dia;await carregar();
+  }catch(e){msg(e.message,false)}finally{b.disabled=false}
+});
+$('dia').onchange=render;$('hoje').onclick=()=>{$('dia').value=hojeStr();render()};
+carregar();setInterval(carregar,30000);
+</script></body></html>
