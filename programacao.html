@@ -32,11 +32,11 @@ button.sec{background:#e9edf4;color:var(--tx)}button.ok{background:var(--ok)}but
 #lock h2{margin:0 0 6px;color:var(--pri)}#lock p{margin:0 0 14px;color:var(--dim);font-size:14px}
 #lock .e{color:var(--bad);font-weight:600;margin-top:8px;min-height:20px;font-size:14px}
 .sair{background:rgba(255,255,255,.14);color:#fff}
-</style></head><body>
-<div id="lock"><form id="lockf"><h2>🔒 Acesso PCP</h2><p>Digite a senha para editar as informações.</p>
+.brand{display:flex;align-items:center;gap:12px}.logo{background:#fff;border-radius:10px;padding:5px 12px;display:flex;align-items:center}.logo img{height:38px;width:auto;display:block}#lock .lg{height:48px;margin-bottom:10px}</style><link rel="icon" href="/logo.png"></head><body>
+<div id="lock"><form id="lockf"><img class="lg" src="/logo.png" alt="Bela Vista"><h2>🔒 Acesso PCP</h2><p>Digite a senha para editar as informações.</p>
 <input type="password" id="lockpw" placeholder="Senha" autocomplete="current-password" autofocus><div class="row" style="margin-top:12px"><button type="submit">Entrar</button><a href="/dashboard.html" style="color:var(--dim);font-size:14px">Ver dashboard</a></div><div class="e" id="locke"></div></form></div>
 
-<header><h1>Usina Bela Vista Argamassas · Programação PCP</h1>
+<header><div class="brand"><span class="logo"><img src="/logo.png" alt="Bela Vista"></span><h1>Usina Bela Vista Argamassas · Programação PCP</h1></div>
 <nav><a class="on" href="/programacao.html">Programação (PCP)</a><a href="/apontamento.html">Apontamento</a><a href="/dashboard.html">Panorama Fábrica</a></nav></header>
 <main>
 <div class="card"><h2 id="form-title">Nova programação</h2>
