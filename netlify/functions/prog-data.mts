@@ -41,6 +41,7 @@ function mapProg(pg: any) {
     inicioPrevisto: txt(p["Início Previsto"]),
     terminoPrevisto: txt(p["Término Previsto"]),
     secagemMin: num(p["Secagem (min)"]),
+    turno: sel(p["Turno"]),
     status: sel(p["Status"]) || "Não iniciado",
     opNumero: txt(p["Nº OP"]),
     qtdProduzida: num(p["Qtd Produzida"]),

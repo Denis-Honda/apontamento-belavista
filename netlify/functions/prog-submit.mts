@@ -96,6 +96,7 @@ export default async (req: Request, _ctx: Context) => {
           "Início Previsto": rt(p.inicioPrevisto || ""),
           "Término Previsto": rt(p.terminoPrevisto || ""),
           "Secagem (min)": num(p.secagemMin),
+          Turno: sel(p.turno || turnoDe(p.inicioPrevisto || "")),
           Status: sel("Não iniciado"),
         },
       });
@@ -111,6 +112,7 @@ export default async (req: Request, _ctx: Context) => {
       if (p.inicioPrevisto !== undefined) props["Início Previsto"] = rt(p.inicioPrevisto);
       if (p.terminoPrevisto !== undefined) props["Término Previsto"] = rt(p.terminoPrevisto);
       if (p.secagemMin !== undefined) props["Secagem (min)"] = num(p.secagemMin);
+      if (p.turno) props.Turno = sel(p.turno);
       await notion(`/v1/pages/${p.id}`, "PATCH", token, { properties: props });
       return json({ ok: true });
     }
