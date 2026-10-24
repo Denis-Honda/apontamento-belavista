@@ -68,6 +68,8 @@ const toMin=h=>{if(!h)return null;const [a,b]=h.split(':').map(Number);return a*
 const fmtD=d=>d.split('-').reverse().join('/');
 const fmtN=n=>(n==null?0:Number(n)).toLocaleString('pt-BR');
 const fmtH=h=>h.toFixed(1).replace('.',',')+' h';
+const TURNOS=["1º Turno","2º Turno","3º Turno"];
+function turnoDe(x){if(x.turno)return x.turno;const h=parseInt((x.inicioPrevisto||'').split(':')[0],10);if(isNaN(h))return '';return h>=6&&h<14?'1º Turno':h>=14&&h<22?'2º Turno':'3º Turno'}
 let prog=[],par=[];
 $('dia').value=hojeStr();
 async function carregar(){
@@ -84,7 +86,7 @@ function resumoMaquina(m,dia,ativoId){
   const prox=todos.filter(x=>x.status==='Não iniciado'&&x.data>=dia&&x.id!==ativoId).sort((a,b)=>k(a).localeCompare(k(b))).slice(0,3);
   let h='';
   h+='<div class="rs"><b>Anterior:</b> '+(ant?`${ant.produto} — ${fmtN(ant.qtdProduzida)} sacos${ant.data!==dia?' ('+fmtD(ant.data).slice(0,5)+')':''}`:'–')+'</div>';
-  h+='<div class="rs"><b>Próximas:</b> '+(prox.length?'':'–')+'</div>'+prox.map(x=>`<div class="rs rl">• ${x.produto} — ${fmtN(x.qtdProgramada)}${x.data!==dia?' ('+fmtD(x.data).slice(0,5)+')':''}</div>`).join('');
+  h+='<div class="rs"><b>Próximas:</b> '+(prox.length?'':'–')+'</div>'+prox.map(x=>`<div class="rs rl">• ${x.produto} — ${fmtN(x.qtdProgramada)} (${turnoDe(x).replace(' Turno','T')})${x.data!==dia?' ('+fmtD(x.data).slice(0,5)+')':''}</div>`).join('');
   return '<div class="rsw">'+h+'</div>';
 }
 function render(){
@@ -117,20 +119,20 @@ function render(){
     if(ativo){
       const f=toMin(ativo.terminoPrevisto),atr=eHoje&&f!=null&&agora>f;
       return `<div class="mc prod"><h3>${m}<span class="badge b-ea">Em produção</span></h3><div class="p">${ativo.produto}</div>
-      <div class="s">${fmtN(ativo.qtdProgramada)} sacos · início ${ativo.inicioReal||'--:--'} · previsto até ${ativo.terminoPrevisto||'--:--'}${atr?' <span class="late">· atrasada</span>':''}</div>${bar}${parTxt}${resumoMaquina(m,dia,ativo.id)}</div>`;
+      <div class="s">${turnoDe(ativo).replace(' Turno','T')} · ${fmtN(ativo.qtdProgramada)} sacos · início ${ativo.inicioReal||'--:--'} · previsto até ${ativo.terminoPrevisto||'--:--'}${atr?' <span class="late">· atrasada</span>':''}</div>${bar}${parTxt}${resumoMaquina(m,dia,ativo.id)}</div>`;
     }
     const prox=l.find(x=>x.status==='Não iniciado');
     if(prox){
       const i=toMin(prox.inicioPrevisto),atr=eHoje&&i!=null&&agora>i;
       return `<div class="mc wait"><h3>${m}<span class="badge b-ni">Aguardando</span></h3><div class="p">Próxima: ${prox.produto}</div>
-      <div class="s">${fmtN(prox.qtdProgramada)} sacos · previsto ${prox.inicioPrevisto||'--:--'}${atr?' <span class="late">· início atrasado</span>':''}</div>${bar}${parTxt}${resumoMaquina(m,dia,prox.id)}</div>`;
+      <div class="s">${turnoDe(prox).replace(' Turno','T')} · ${fmtN(prox.qtdProgramada)} sacos · previsto ${prox.inicioPrevisto||'--:--'}${atr?' <span class="late">· início atrasado</span>':''}</div>${bar}${parTxt}${resumoMaquina(m,dia,prox.id)}</div>`;
     }
     return `<div class="mc done"><h3>${m}<span class="badge b-co">Concluído</span></h3><div class="p">Programação do dia finalizada</div>${bar}${parTxt}${resumoMaquina(m,dia,null)}</div>`;
   }).join('');
   // tabela
-  const ord=its.slice().sort((a,b)=>(a.inicioPrevisto||'').localeCompare(b.inicioPrevisto||'')||a.maquina.localeCompare(b.maquina));
-  $('prog').innerHTML=ord.length?'<table><tr><th>Máquina</th><th>Produto</th><th>Programado</th><th>Previsto</th><th>Real</th><th>Produzido</th><th>Status</th></tr>'+ord.map(x=>
-    `<tr><td>${x.maquina}</td><td>${x.produto}</td><td>${fmtN(x.qtdProgramada)}</td><td>${x.inicioPrevisto||'--:--'} – ${x.terminoPrevisto||'--:--'}</td><td>${x.inicioReal?x.inicioReal+' – '+(x.terminoReal||'…'):'–'}</td><td>${x.status==='Concluído'?fmtN(x.qtdProduzida):'–'}</td>
+  const ord=its.slice().sort((a,b)=>turnoDe(a).localeCompare(turnoDe(b))||(a.inicioPrevisto||'').localeCompare(b.inicioPrevisto||'')||a.maquina.localeCompare(b.maquina));
+  $('prog').innerHTML=ord.length?'<table><tr><th>Turno</th><th>Máquina</th><th>Produto</th><th>Programado</th><th>Previsto</th><th>Real</th><th>Produzido</th><th>Status</th></tr>'+ord.map(x=>
+    `<tr><td>${turnoDe(x).replace(' Turno','T')}</td><td>${x.maquina}</td><td>${x.produto}</td><td>${fmtN(x.qtdProgramada)}</td><td>${x.inicioPrevisto||'--:--'} – ${x.terminoPrevisto||'--:--'}</td><td>${x.inicioReal?x.inicioReal+' – '+(x.terminoReal||'…'):'–'}</td><td>${x.status==='Concluído'?fmtN(x.qtdProduzida):'–'}</td>
     <td><span class="badge ${x.status==='Concluído'?'b-co':x.status==='Em andamento'?'b-ea':'b-ni'}">${x.status}</span></td></tr>`).join('')+'</table>':'<div class="empty">Nenhuma programação para este dia.</div>';
   // próximos 7 dias
   const dias=[];for(let i=0;i<7;i++){const d=new Date(dia+'T00:00:00Z');d.setUTCDate(d.getUTCDate()+i);dias.push(d.toISOString().slice(0,10))}

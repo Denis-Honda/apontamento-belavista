@@ -69,6 +69,8 @@ document.getElementById('lockf').addEventListener('submit',async ev=>{ev.prevent
 if(SENHA)entrar(SENHA).then(ok=>{if(!ok)travar('')});
 const MAQUINAS=["Máquina 00","Máquina 01","Máquina 02","Máquina 03","Máquina 04","Máquina 05","Máquina 06"];
 const MOTIVOS=["Falta de energia","Falta de funcionário","Falta de Matéria-prima","Falta de Mecânico","Falta de Embalagem","Limpeza","Manutenção","Máquina quebrada","Reunião","Saída Médico / Particular","Sem demanda","Trator quebrado","Treinamento"];
+const TURNOS=["1º Turno","2º Turno","3º Turno"];
+function turnoDe(x){if(x.turno)return x.turno;const h=parseInt((x.inicioPrevisto||'').split(':')[0],10);if(isNaN(h))return '';return h>=6&&h<14?'1º Turno':h>=14&&h<22?'2º Turno':'3º Turno'}
 let prog=[],paradas=[];
 const $=id=>document.getElementById(id);
 const brNow=()=>new Date(Date.now()-3*3600000);
@@ -110,7 +112,7 @@ function render(){
     const l=its.filter(x=>x.maquina===m).sort((a,b)=>(a.inicioPrevisto||'').localeCompare(b.inicioPrevisto||''));
     if(!l.length)return '';
     return `<div class="maq"><h3>${m}</h3>`+l.map(x=>`<div class="item"><div class="row" style="justify-content:space-between"><div><div class="t">${x.produto}</div>
-    <div class="s">Programado: ${fmtN(x.qtdProgramada)} sacos · ${x.inicioPrevisto||'--:--'} às ${x.terminoPrevisto||'--:--'} · secagem ${x.secagemMin??0} min</div></div>
+    <div class="s">${turnoDe(x)||'Turno ?'} · Programado: ${fmtN(x.qtdProgramada)} sacos · ${x.inicioPrevisto||'--:--'} às ${x.terminoPrevisto||'--:--'} · secagem ${x.secagemMin??0} min</div></div>
     <span class="badge ${cls(x.status)}">${x.status}</span></div>${acao(x)}</div>`).join('')+'</div>';
   }).join(''):'<div class="empty">Nenhuma programação do PCP para este dia.</div>';
   const ps=paradas.filter(x=>x.data===dia);
@@ -137,21 +139,21 @@ $('dia').onchange=()=>{$('p-data').value=$('dia').value;render()};
 $('hoje').onclick=()=>{$('dia').value=hojeStr();$('p-data').value=hojeStr();render()};
 $('atualizar').onclick=carregar;
 function exportarExcel(){
-  const dia=$('dia').value,its=prog.filter(x=>x.data===dia).sort((a,b)=>a.maquina.localeCompare(b.maquina)||(a.inicioPrevisto||'').localeCompare(b.inicioPrevisto||'')),ps=paradas.filter(x=>x.data===dia);
+  const dia=$('dia').value,its=prog.filter(x=>x.data===dia).sort((a,b)=>turnoDe(a).localeCompare(turnoDe(b))||a.maquina.localeCompare(b.maquina)||(a.inicioPrevisto||'').localeCompare(b.inicioPrevisto||'')),ps=paradas.filter(x=>x.data===dia);
   if(typeof XLSX==='undefined'){alert('Biblioteca de Excel não carregou. Verifique a conexão e tente novamente.');return}
   const d=fmtD(dia);
-  const a=[['Data','Máquina','Produto','Nº OP','Qtd planejada (sacos)','Qtd realizada (sacos)','Diferença','% realizado','Início previsto','Término previsto','Início real','Término real','Secagem (min)','Status']];
+  const a=[['Data','Turno','Máquina','Produto','Nº OP','Qtd planejada (sacos)','Qtd realizada (sacos)','Diferença','% realizado','Início previsto','Término previsto','Início real','Término real','Secagem (min)','Status']];
   let tp=0,tr=0;
   its.forEach(x=>{const pl=x.qtdProgramada||0,re=x.status==='Concluído'?(x.qtdProduzida||0):0;tp+=pl;tr+=re;
-    a.push([d,x.maquina,x.produto,x.opNumero||'',pl,x.status==='Concluído'?re:'',x.status==='Concluído'?re-pl:'',x.status==='Concluído'&&pl?re/pl:'',x.inicioPrevisto||'',x.terminoPrevisto||'',x.inicioReal||'',x.terminoReal||'',x.secagemMin??'',x.status])});
-  a.push([]);a.push(['TOTAL','','','',tp,tr,tr-tp,tp?tr/tp:'']);
+    a.push([d,turnoDe(x),x.maquina,x.produto,x.opNumero||'',pl,x.status==='Concluído'?re:'',x.status==='Concluído'?re-pl:'',x.status==='Concluído'&&pl?re/pl:'',x.inicioPrevisto||'',x.terminoPrevisto||'',x.inicioReal||'',x.terminoReal||'',x.secagemMin??'',x.status])});
+  a.push([]);a.push(['TOTAL','','','','',tp,tr,tr-tp,tp?tr/tp:'']);
   const h=[['Data','Máquina','Motivo','Início','Término','Horas paradas','Observações']];let th=0;
   ps.forEach(x=>{th+=x.horasParadas||0;h.push([d,x.maquina,x.motivo||'',x.horaInicio||'',x.horaTermino||'',x.horasParadas==null?'':x.horasParadas,x.obs||''])});
   h.push([]);h.push(['TOTAL','','','','',Math.round(th*100)/100,'']);
   const wb=XLSX.utils.book_new(),w1=XLSX.utils.aoa_to_sheet(a),w2=XLSX.utils.aoa_to_sheet(h);
-  w1['!cols']=[{wch:11},{wch:13},{wch:46},{wch:10},{wch:14},{wch:14},{wch:10},{wch:11},{wch:10},{wch:10},{wch:10},{wch:10},{wch:10},{wch:14}];
+  w1['!cols']=[{wch:11},{wch:10},{wch:13},{wch:46},{wch:10},{wch:14},{wch:14},{wch:10},{wch:11},{wch:10},{wch:10},{wch:10},{wch:10},{wch:10},{wch:14}];
   w2['!cols']=[{wch:11},{wch:13},{wch:26},{wch:8},{wch:8},{wch:12},{wch:30}];
-  for(let r=1;r<=a.length;r++){const c=w1['H'+r];if(c&&typeof c.v==='number')c.z='0.0%'}
+  for(let r=1;r<=a.length;r++){const c=w1['I'+r];if(c&&typeof c.v==='number')c.z='0.0%'}
   XLSX.utils.book_append_sheet(wb,w1,'Planejado x Realizado');XLSX.utils.book_append_sheet(wb,w2,'Horas paradas');
   XLSX.writeFile(wb,'apontamento_'+dia+'.xlsx');
 }
