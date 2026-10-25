@@ -8,6 +8,8 @@ const CORS: Record<string, string> = {
 const NOTION_VERSION = "2022-06-28";
 const PROG_DB = "df4e3905-2eef-48ec-93ac-be17ff30fdc4";
 const PARADAS_DB = "66ed6629-11b0-4326-bbab-f8eb448fadb8";
+const FALTAS_DB = "ca7bd838-5ee7-4b4f-ac0a-92a045d62416";
+const FUNCOES = ["Envasador(a)", "Operador(a) de Máquina", "Operador(a) de Trator", "Operador(a) Empilhadeira", "Etiquetador(a)", "Preparador(a) de Aditivos"];
 
 const rt = (t: any) => ({ rich_text: [{ text: { content: String(t ?? "") } }] });
 const title = (t: any) => ({ title: [{ text: { content: String(t ?? "") } }] });
@@ -164,6 +166,31 @@ export default async (req: Request, _ctx: Context) => {
         },
       });
       return json({ ok: true, id: page.id, horas });
+    }
+
+    // ---- Faltas de colaboradores ----
+    if (action === "registrar_falta") {
+      if (!p.data || !p.turno || !p.funcao || !p.quantidade) throw new Error("Campos obrigatórios: Data, Turno, Função e Quantidade");
+      if (!FUNCOES.includes(p.funcao)) throw new Error("Função inválida");
+      const q = Number(p.quantidade);
+      if (!Number.isInteger(q) || q < 1) throw new Error("Quantidade deve ser um número inteiro maior que zero");
+      const page = await notion("/v1/pages", "POST", token, {
+        parent: { type: "database_id", database_id: FALTAS_DB },
+        properties: {
+          "Função": title(p.funcao),
+          Data: { date: { start: p.data } },
+          Turno: sel(p.turno),
+          Quantidade: num(q),
+          Observações: rt(p.obs || ""),
+          "Local ID": rt(`falta-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`),
+        },
+      });
+      return json({ ok: true, id: page.id });
+    }
+    if (action === "excluir_falta") {
+      if (!p.id) throw new Error("id é obrigatório");
+      await notion(`/v1/pages/${p.id}`, "PATCH", token, { archived: true });
+      return json({ ok: true });
     }
 
     throw new Error(`Ação desconhecida: ${action}`);

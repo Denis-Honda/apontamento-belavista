@@ -7,6 +7,7 @@ const CORS: Record<string, string> = {
 const NOTION_VERSION = "2022-06-28";
 const PROG_DB = "df4e3905-2eef-48ec-93ac-be17ff30fdc4";
 const PARADAS_DB = "66ed6629-11b0-4326-bbab-f8eb448fadb8";
+const FALTAS_DB = "ca7bd838-5ee7-4b4f-ac0a-92a045d62416";
 
 const txt = (p: any) => ((p && (p.title || p.rich_text)) || []).map((t: any) => t.plain_text).join("");
 const num = (p: any) => (p && typeof p.number === "number" ? p.number : null);
@@ -63,13 +64,33 @@ function mapParada(pg: any) {
   };
 }
 
+function mapFalta(pg: any) {
+  const p = pg.properties || {};
+  return {
+    id: pg.id,
+    funcao: txt(p["Função"]),
+    data: dt(p["Data"]),
+    turno: sel(p["Turno"]),
+    quantidade: num(p["Quantidade"]),
+    obs: txt(p["Observações"]),
+  };
+}
+
 export default async (req: Request, _ctx: Context) => {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
   const token = Netlify.env.get("NOTION_TOKEN");
   if (!token) return new Response(JSON.stringify({ error: "NOTION_TOKEN not configured" }), { status: 500, headers: { "Content-Type": "application/json", ...CORS } });
   try {
     const [prog, par] = await Promise.all([queryAll(PROG_DB, token), queryAll(PARADAS_DB, token)]);
-    return new Response(JSON.stringify({ programacao: prog.map(mapProg), paradas: par.map(mapParada), updatedAt: Date.now() }), {
+    // Faltas: se o banco ainda não foi compartilhado com a integração, não derruba o resto.
+    let faltas: any[] = [];
+    let faltasErro: string | null = null;
+    try {
+      faltas = (await queryAll(FALTAS_DB, token)).map(mapFalta);
+    } catch (e: any) {
+      faltasErro = String((e && e.message) || e).slice(0, 200);
+    }
+    return new Response(JSON.stringify({ programacao: prog.map(mapProg), paradas: par.map(mapParada), faltas, faltasErro, updatedAt: Date.now() }), {
       status: 200, headers: { "Content-Type": "application/json", ...CORS },
     });
   } catch (e: any) {
