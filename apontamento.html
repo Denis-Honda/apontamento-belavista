@@ -32,18 +32,24 @@ button.sec{background:#e9edf4;color:var(--tx)}button.ok{background:var(--ok)}but
 #lock h2{margin:0 0 6px;color:var(--pri)}#lock p{margin:0 0 14px;color:var(--dim);font-size:14px}
 #lock .e{color:var(--bad);font-weight:600;margin-top:8px;min-height:20px;font-size:14px}
 .sair{background:rgba(255,255,255,.14);color:#fff}
-.brand{display:flex;align-items:center;gap:12px}.logo{background:#fff;border-radius:10px;padding:5px 12px;display:flex;align-items:center}.logo img{height:38px;width:auto;display:block}#lock .lg{height:48px;margin-bottom:10px}</style><script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script><link rel="icon" href="/logo.png"></head><body>
+.brand{display:flex;align-items:center;gap:12px}.logo{background:#fff;border-radius:10px;padding:5px 12px;display:flex;align-items:center}.logo img{height:38px;width:auto;display:block}#lock .lg{height:48px;margin-bottom:10px}.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
+.tab{background:#e9edf4;color:var(--tx);border-radius:10px 10px 0 0;padding:11px 18px}.tab.on{background:var(--pri);color:#fff}
+.sec{display:none}.sec.on{display:block}
+</style><script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script><link rel="icon" href="/logo.png"></head><body>
 <div id="lock"><form id="lockf"><img class="lg" src="/logo.png" alt="Bela Vista"><h2>🔒 Acesso Apontamento</h2><p>Digite a senha para editar as informações.</p>
 <input type="password" id="lockpw" placeholder="Senha" autocomplete="current-password" autofocus><div class="row" style="margin-top:12px"><button type="submit">Entrar</button><a href="/dashboard.html" style="color:var(--dim);font-size:14px">Ver dashboard</a></div><div class="e" id="locke"></div></form></div>
 
 <header><div class="brand"><span class="logo"><img src="/logo.png" alt="Bela Vista"></span><h1>Usina Bela Vista Argamassas · Apontamento</h1></div>
 <nav><a href="/programacao.html">Programação (PCP)</a><a class="on" href="/apontamento.html">Apontamento</a><a href="/dashboard.html">Panorama Fábrica</a></nav></header>
 <main>
-<div class="card"><div class="row" style="justify-content:space-between"><h2 style="margin:0">Programação do dia</h2>
-<div class="row"><input type="date" id="dia" style="width:auto"><button class="sec sm" id="hoje">Hoje</button><button class="sec sm" id="atualizar">↻ Atualizar</button><button class="ok sm" id="excel">⬇ Exportar Excel do dia</button></div></div>
-<div id="resumo" style="color:var(--dim);margin:8px 0 12px"></div><div id="lista"></div><div id="msg" class="msg"></div></div>
+<div class="card"><div class="row" style="justify-content:space-between"><div class="row"><label style="margin:0">Dia</label><input type="date" id="dia" style="width:auto"><button class="sec sm" id="hoje">Hoje</button></div>
+<div class="row"><button class="sec sm" id="atualizar">↻ Atualizar</button><button class="ok sm" id="excel">⬇ Exportar Excel do dia</button></div></div></div>
+<div class="tabs"><button class="tab on" data-tab="prod">Produção</button><button class="tab" data-tab="par">Horas paradas</button><button class="tab" data-tab="falt">Faltas de colaboradores</button></div>
 
-<div class="card"><h2>Horas paradas</h2>
+<div class="sec on" id="sec-prod"><div class="card"><h2>Programação do dia</h2>
+<div id="resumo" style="color:var(--dim);margin:0 0 12px"></div><div id="lista"></div><div id="msg" class="msg"></div></div></div>
+
+<div class="sec" id="sec-par"><div class="card"><h2>Horas paradas das máquinas</h2>
 <form id="fp" autocomplete="off"><div class="grid">
 <div><label>Data *</label><input type="date" id="p-data" required></div>
 <div><label>Máquina *</label><select id="p-maq" required></select></div>
@@ -52,8 +58,18 @@ button.sec{background:#e9edf4;color:var(--tx)}button.ok{background:var(--ok)}but
 <div><label>Término *</label><input type="time" id="p-fim" required></div>
 <div><label>Horas paradas</label><input type="text" id="p-horas" readonly placeholder="0,00"></div>
 <div style="grid-column:span 2"><label>Observações</label><input type="text" id="p-obs"></div>
-</div><div class="row" style="margin-top:12px"><button type="submit" id="p-btn">Registrar parada</button></div><div id="p-msg" class="msg"></div></form>
-<h2 style="margin-top:20px">Paradas do dia</h2><div id="paradas"></div></div>
+</div><div class="row" style="margin-top:12px"><button type="submit" id="p-btn">Registrar parada</button></div><div id="p-msg" class="msg"></div></form></div>
+<div class="card"><h2>Paradas do dia</h2><div id="paradas"></div></div></div>
+
+<div class="sec" id="sec-falt"><div class="card"><h2>Faltas de colaboradores</h2>
+<form id="ff" autocomplete="off"><div class="grid">
+<div><label>Data *</label><input type="date" id="f-data" required></div>
+<div><label>Turno *</label><select id="f-turno" required></select></div>
+<div style="grid-column:span 2"><label>Função *</label><select id="f-funcao" required></select></div>
+<div><label>Quantidade de faltas *</label><input type="number" id="f-qtd" min="1" step="1" inputmode="numeric" value="1" required></div>
+<div style="grid-column:span 2"><label>Observações</label><input type="text" id="f-obs"></div>
+</div><div class="row" style="margin-top:12px"><button type="submit" id="f-btn">Registrar falta</button></div><div id="f-msg" class="msg"></div></form></div>
+<div class="card"><h2>Faltas do dia</h2><div id="faltas"></div></div></div>
 </main>
 <script>
 
@@ -71,7 +87,8 @@ const MAQUINAS=["Máquina 00","Máquina 01","Máquina 02","Máquina 03","Máquin
 const MOTIVOS=["Falta de energia","Falta de funcionário","Falta de Matéria-prima","Falta de Mecânico","Falta de Embalagem","Limpeza","Manutenção","Máquina quebrada","Reunião","Saída Médico / Particular","Sem demanda","Trator quebrado","Treinamento"];
 const TURNOS=["1º Turno","2º Turno","3º Turno"];
 function turnoDe(x){if(x.turno)return x.turno;const h=parseInt((x.inicioPrevisto||'').split(':')[0],10);if(isNaN(h))return '';return h>=6&&h<14?'1º Turno':h>=14&&h<22?'2º Turno':'3º Turno'}
-let prog=[],paradas=[];
+const FUNCOES=["Envasador(a)","Operador(a) de Máquina","Operador(a) de Trator","Operador(a) Empilhadeira","Etiquetador(a)","Preparador(a) de Aditivos"];
+let prog=[],paradas=[],faltas=[],faltasErro=null;
 const $=id=>document.getElementById(id);
 const brNow=()=>new Date(Date.now()-3*3600000);
 const hojeStr=()=>brNow().toISOString().slice(0,10);
@@ -80,15 +97,15 @@ const fmtD=d=>d?d.split('-').reverse().join('/'):'';
 const fmtN=n=>n==null?'–':Number(n).toLocaleString('pt-BR');
 function flash(el,t,ok){el.textContent=t;el.className='msg '+(ok?'ok':'err');setTimeout(()=>{el.className='msg'},5000)}
 function fill(sel,arr,ph){sel.innerHTML=`<option value="">${ph}</option>`+arr.map(a=>`<option>${a}</option>`).join('')}
-fill($('p-maq'),MAQUINAS,'Selecione');fill($('p-motivo'),MOTIVOS,'Selecione');
-$('dia').value=hojeStr();$('p-data').value=hojeStr();
+fill($('f-turno'),TURNOS,'Selecione');fill($('f-funcao'),FUNCOES,'Selecione');fill($('p-maq'),MAQUINAS,'Selecione');fill($('p-motivo'),MOTIVOS,'Selecione');
+$('dia').value=hojeStr();$('p-data').value=hojeStr();$('f-data').value=hojeStr();
 async function api(action,payload){
   const r=await fetch('/api/prog-submit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,payload,senha:SENHA})});
   const j=await r.json();if(r.status===401){travar('Sessão expirada. Digite a senha novamente.');throw new Error('Senha necessária')}if(!r.ok||j.error)throw new Error(j.error||'Erro');return j;
 }
 async function carregar(){
   try{const r=await fetch('/api/prog-data',{cache:'no-store'});const j=await r.json();if(j.error)throw new Error(j.error);
-    prog=j.programacao||[];paradas=j.paradas||[];render()}
+    prog=j.programacao||[];paradas=j.paradas||[];faltas=j.faltas||[];faltasErro=j.faltasErro||null;render()}
   catch(e){$('lista').innerHTML='<div class="empty">Falha ao carregar: '+e.message+'</div>'}
 }
 const cls=s=>s==='Concluído'?'b-co':s==='Em andamento'?'b-ea':'b-ni';
@@ -104,7 +121,7 @@ function acao(x){
   return `<div class="s" style="margin-top:6px">OP ${x.opNumero||'–'} · real ${x.inicioReal||'--:--'} às ${x.terminoReal||'--:--'} · <b>${fmtN(x.qtdProduzida)}</b> sacos produzidos (programado ${fmtN(x.qtdProgramada)})</div>
     <div class="row" style="margin-top:8px"><button class="sec sm" onclick="status('${x.id}','Em andamento')">Reabrir</button></div>`;
 }
-function render(){
+function render(){renderFaltas();
   const dia=$('dia').value,its=prog.filter(x=>x.data===dia);
   const prod=its.filter(x=>x.status==='Concluído').reduce((s,x)=>s+(x.qtdProduzida||0),0);
   $('resumo').textContent=`${fmtD(dia)} · ${its.length} programada(s) · ${its.filter(x=>x.status==='Concluído').length} concluída(s) · ${fmtN(prod)} sacos produzidos`;
@@ -119,6 +136,22 @@ function render(){
   $('paradas').innerHTML=ps.length?'<table style="width:100%;border-collapse:collapse;font-size:14px"><tr style="text-align:left;color:var(--dim)"><th>Máquina</th><th>Motivo</th><th>Início</th><th>Término</th><th>Horas</th><th>Obs.</th></tr>'+
     ps.map(x=>`<tr style="border-top:1px solid var(--bd)"><td>${x.maquina}</td><td>${x.motivo||'–'}</td><td>${x.horaInicio||''}</td><td>${x.horaTermino||''}</td><td>${x.horasParadas==null?'–':x.horasParadas.toFixed(2).replace('.',',')}</td><td>${x.obs||''}</td></tr>`).join('')+'</table>':'<div class="empty">Nenhuma parada registrada neste dia.</div>';
 }
+function renderFaltas(){
+  const dia=$('dia').value,fs=faltas.filter(x=>x.data===dia);
+  if(faltasErro){$('faltas').innerHTML='<div class="empty">O banco de faltas ainda não foi liberado para o sistema (compartilhar o banco "Faltas de Colaboradores" com a integração do Notion).</div>';return}
+  const tot=fs.reduce((s,x)=>s+(x.quantidade||0),0);
+  $('faltas').innerHTML=fs.length?'<table style="width:100%;border-collapse:collapse;font-size:14px"><tr style="text-align:left;color:var(--dim)"><th>Turno</th><th>Função</th><th>Qtd</th><th>Obs.</th><th></th></tr>'+
+    fs.sort((a,b)=>(a.turno||'').localeCompare(b.turno||'')).map(x=>`<tr style="border-top:1px solid var(--bd)"><td>${x.turno||'–'}</td><td>${x.funcao}</td><td>${x.quantidade}</td><td>${x.obs||''}</td><td><button class="bad sm" onclick="excluirFalta('${x.id}')">Excluir</button></td></tr>`).join('')+
+    `<tr style="border-top:2px solid var(--bd);font-weight:700"><td colspan="2">Total de faltas no dia</td><td>${tot}</td><td colspan="2"></td></tr></table>`:'<div class="empty">Nenhuma falta registrada neste dia.</div>';
+}
+const excluirFalta=id=>{if(!confirm('Excluir este registro de falta?'))return;run(async()=>{await api('excluir_falta',{id})})};
+document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x===b));document.querySelectorAll('.sec').forEach(s=>s.classList.toggle('on',s.id==='sec-'+b.dataset.tab))});
+$('ff').addEventListener('submit',async ev=>{
+  ev.preventDefault();const b=$('f-btn');b.disabled=true;
+  try{await api('registrar_falta',{data:$('f-data').value,turno:$('f-turno').value,funcao:$('f-funcao').value,quantidade:+$('f-qtd').value,obs:$('f-obs').value});
+    flash($('f-msg'),'Falta registrada.',true);const d=$('f-data').value;$('ff').reset();$('f-data').value=d;$('f-qtd').value=1;$('dia').value=d;await carregar()}
+  catch(e){flash($('f-msg'),e.message,false)}finally{b.disabled=false}
+});
 async function run(fn){try{await fn();await carregar()}catch(e){flash($('msg'),e.message,false)}}
 const iniciar=id=>run(async()=>{await api('iniciar_producao',{id,opNumero:$('op-'+id).value.trim(),inicioReal:$('ir-'+id).value});flash($('msg'),'Produção iniciada.',true)});
 const concluir=id=>run(async()=>{await api('concluir_producao',{id,terminoReal:$('tr-'+id).value,qtdProduzida:$('qp-'+id).value});flash($('msg'),'Produção concluída.',true)});
@@ -135,8 +168,8 @@ $('fp').addEventListener('submit',async ev=>{
     flash($('p-msg'),'Parada registrada.',true);const d=$('p-data').value;$('fp').reset();$('p-data').value=d;$('dia').value=d;await carregar()}
   catch(e){flash($('p-msg'),e.message,false)}finally{b.disabled=false}
 });
-$('dia').onchange=()=>{$('p-data').value=$('dia').value;render()};
-$('hoje').onclick=()=>{$('dia').value=hojeStr();$('p-data').value=hojeStr();render()};
+$('dia').onchange=()=>{$('p-data').value=$('dia').value;$('f-data').value=$('dia').value;render()};
+$('hoje').onclick=()=>{$('dia').value=hojeStr();$('p-data').value=hojeStr();$('f-data').value=hojeStr();render()};
 $('atualizar').onclick=carregar;
 function exportarExcel(){
   const dia=$('dia').value,its=prog.filter(x=>x.data===dia).sort((a,b)=>turnoDe(a).localeCompare(turnoDe(b))||a.maquina.localeCompare(b.maquina)||(a.inicioPrevisto||'').localeCompare(b.inicioPrevisto||'')),ps=paradas.filter(x=>x.data===dia);
@@ -150,11 +183,16 @@ function exportarExcel(){
   const h=[['Data','Máquina','Motivo','Início','Término','Horas paradas','Observações']];let th=0;
   ps.forEach(x=>{th+=x.horasParadas||0;h.push([d,x.maquina,x.motivo||'',x.horaInicio||'',x.horaTermino||'',x.horasParadas==null?'':x.horasParadas,x.obs||''])});
   h.push([]);h.push(['TOTAL','','','','',Math.round(th*100)/100,'']);
+  const fs=faltas.filter(x=>x.data===dia).sort((a,b)=>(a.turno||'').localeCompare(b.turno||''));
+  const fa=[['Data','Turno','Função','Quantidade de faltas','Observações']];let tf=0;
+  fs.forEach(x=>{tf+=x.quantidade||0;fa.push([d,x.turno||'',x.funcao,x.quantidade||0,x.obs||''])});
+  fa.push([]);fa.push(['TOTAL','','',tf,'']);
+  const w3=XLSX.utils.aoa_to_sheet(fa);w3['!cols']=[{wch:11},{wch:10},{wch:28},{wch:20},{wch:30}];
   const wb=XLSX.utils.book_new(),w1=XLSX.utils.aoa_to_sheet(a),w2=XLSX.utils.aoa_to_sheet(h);
   w1['!cols']=[{wch:11},{wch:10},{wch:13},{wch:46},{wch:10},{wch:14},{wch:14},{wch:10},{wch:11},{wch:10},{wch:10},{wch:10},{wch:10},{wch:10},{wch:14}];
   w2['!cols']=[{wch:11},{wch:13},{wch:26},{wch:8},{wch:8},{wch:12},{wch:30}];
   for(let r=1;r<=a.length;r++){const c=w1['I'+r];if(c&&typeof c.v==='number')c.z='0.0%'}
-  XLSX.utils.book_append_sheet(wb,w1,'Planejado x Realizado');XLSX.utils.book_append_sheet(wb,w2,'Horas paradas');
+  XLSX.utils.book_append_sheet(wb,w1,'Planejado x Realizado');XLSX.utils.book_append_sheet(wb,w2,'Horas paradas');XLSX.utils.book_append_sheet(wb,w3,'Faltas de colaboradores');
   XLSX.writeFile(wb,'apontamento_'+dia+'.xlsx');
 }
 $('excel').onclick=exportarExcel;
