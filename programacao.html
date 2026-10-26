@@ -32,7 +32,12 @@ button.sec{background:#e9edf4;color:var(--tx)}button.ok{background:var(--ok)}but
 #lock h2{margin:0 0 6px;color:var(--pri)}#lock p{margin:0 0 14px;color:var(--dim);font-size:14px}
 #lock .e{color:var(--bad);font-weight:600;margin-top:8px;min-height:20px;font-size:14px}
 .sair{background:rgba(255,255,255,.14);color:#fff}
-.brand{display:flex;align-items:center;gap:12px}.logo{background:#fff;border-radius:10px;padding:5px 12px;display:flex;align-items:center}.logo img{height:38px;width:auto;display:block}#lock .lg{height:48px;margin-bottom:10px}</style><link rel="icon" href="/logo.png"></head><body>
+.brand{display:flex;align-items:center;gap:12px}.logo{background:#fff;border-radius:10px;padding:5px 12px;display:flex;align-items:center}.logo img{height:38px;width:auto;display:block}#lock .lg{height:48px;margin-bottom:10px}.rolagem{max-height:360px;overflow-y:scroll;position:relative;padding-right:6px;scrollbar-width:auto;scrollbar-color:var(--pri2) #e9edf4}
+.rolagem::-webkit-scrollbar{width:12px}.rolagem::-webkit-scrollbar-track{background:#e9edf4;border-radius:6px}.rolagem::-webkit-scrollbar-thumb{background:var(--pri2);border-radius:6px}
+.dia-h{position:sticky;top:0;z-index:1;background:#eef2f8;border-radius:6px;padding:5px 10px;margin:8px 0 2px;font-size:13px;font-weight:700;color:var(--pri);display:flex;justify-content:space-between}
+.dia-h.hoje{background:var(--pri);color:#fff}
+.rhint{display:none;font-size:12px;font-weight:700;color:var(--pri2);background:#e9edf4;border-radius:99px;padding:3px 10px}
+.maq h3{display:flex;justify-content:space-between;align-items:center;gap:8px}</style><link rel="icon" href="/logo.png"></head><body>
 <div id="lock"><form id="lockf"><img class="lg" src="/logo.png" alt="Bela Vista"><h2>🔒 Acesso PCP</h2><p>Digite a senha para editar as informações.</p>
 <input type="password" id="lockpw" placeholder="Senha" autocomplete="current-password" autofocus><div class="row" style="margin-top:12px"><button type="submit">Entrar</button><a href="/dashboard.html" style="color:var(--dim);font-size:14px">Ver dashboard</a></div><div class="e" id="locke"></div></form></div>
 
@@ -58,8 +63,8 @@ button.sec{background:#e9edf4;color:var(--tx)}button.ok{background:var(--ok)}but
 <div id="msg" class="msg"></div>
 </form></div>
 
-<div class="card"><div class="row" style="justify-content:space-between"><h2 style="margin:0">Programação do dia</h2>
-<div class="row"><label style="margin:0">Dia</label><input type="date" id="dia" style="width:auto"><button class="sec sm" id="hoje">Hoje</button></div></div>
+<div class="card"><div class="row" style="justify-content:space-between"><h2 style="margin:0">Programação por máquina</h2>
+<div class="row"><select id="modo" style="width:auto"><option value="todos">Todos os dias</option><option value="dia">Somente o dia</option></select><input type="date" id="dia" style="width:auto"><button class="sec sm" id="hoje">Hoje</button></div></div>
 <div id="resumo" class="s" style="color:var(--dim);margin:8px 0 12px"></div>
 <div id="lista"></div></div>
 </main>
@@ -158,19 +163,40 @@ async function carregar(){
   try{const r=await fetch('/api/prog-data',{cache:'no-store'});const j=await r.json();if(j.error)throw new Error(j.error);dados=j.programacao||[];render()}
   catch(e){$('lista').innerHTML='<div class="empty">Falha ao carregar: '+e.message+'</div>'}
 }
+const DS=['dom','seg','ter','qua','qui','sex','sáb'];
+const diaSem=d=>DS[new Date(d+'T00:00:00Z').getUTCDay()];
+let primeiraVez=true;
 function render(){
-  const dia=$('dia').value,itens=dados.filter(x=>x.data===dia);
+  const dia=$('dia').value,modo=$('modo').value,hoje=hojeStr();
+  const itens=modo==='dia'?dados.filter(x=>x.data===dia):dados.slice();
   const tot=itens.reduce((s,x)=>s+(x.qtdProgramada||0),0);
-  $('resumo').textContent=`${fmtD(dia)} · ${itens.length} programação(ões) · ${fmtN(tot)} sacos programados`;
+  const dias=new Set(itens.map(x=>x.data)).size;
+  $('resumo').textContent=(modo==='dia'?fmtD(dia):'Todos os dias')+` · ${itens.length} programação(ões)${modo==='dia'?'':' em '+dias+' dia(s)'} · ${fmtN(tot)} sacos programados`;
+  // guarda a posição de rolagem de cada máquina para não "pular" nas atualizações automáticas
+  const pos={};document.querySelectorAll('.rolagem').forEach(e=>pos[e.dataset.m]=e.scrollTop);
   $('lista').innerHTML=MAQUINAS.map(m=>{
-    const its=itens.filter(x=>x.maquina===m).sort((a,b)=>(a.inicioPrevisto||'').localeCompare(b.inicioPrevisto||''));
-    return `<div class="maq"><h3>${m}</h3>`+(its.length?its.map(x=>`<div class="item"><div class="row" style="justify-content:space-between"><div><div class="t">${x.produto} — ${fmtN(x.qtdProgramada)} sacos</div>
+    const its=itens.filter(x=>x.maquina===m).sort((a,b)=>(a.data||'').localeCompare(b.data||'')||(a.inicioPrevisto||'').localeCompare(b.inicioPrevisto||''));
+    let corpo='',ult=null;
+    its.forEach(x=>{
+      if(x.data!==ult){ult=x.data;const q=its.filter(y=>y.data===x.data).reduce((s,y)=>s+(y.qtdProgramada||0),0);
+        corpo+=`<div class="dia-h${x.data===hoje?' hoje':''}" data-d="${x.data}"><span>📅 ${fmtD(x.data)} (${diaSem(x.data)})${x.data===hoje?' · hoje':''}</span><span>${fmtN(q)} sacos</span></div>`}
+      corpo+=`<div class="item"><div class="row" style="justify-content:space-between"><div><div class="t">${x.produto} — ${fmtN(x.qtdProgramada)} sacos</div>
     <div class="s">${turnoDe(x)||'Turno ?'} · ${x.inicioPrevisto||'--:--'} às ${x.terminoPrevisto||'--:--'} · setup ${x.setupMin??0} min · secagem ${x.secagemMin??0} min${x.tempoNecessario!=null?' · '+x.tempoNecessario.toFixed(2).replace('.',',')+' h necessárias ('+fmtN(x.tempoPadrao)+' sacos/h)':''}${x.opNumero?' · OP '+x.opNumero:''}</div></div>
     <div class="row"><span class="badge ${x.status==='Concluído'?'b-co':x.status==='Em andamento'?'b-ea':'b-ni'}">${x.status}</span>
     <button class="sec sm" onclick="editar('${x.id}')">Editar</button>
-    ${x.status==='Não iniciado'?`<button class="bad sm" onclick="excluir('${x.id}')">Excluir</button>`:''}</div></div></div>`).join(''):'<div class="empty">Nada programado.</div>')+'</div>';
+    ${x.status==='Não iniciado'?`<button class="bad sm" onclick="excluir('${x.id}')">Excluir</button>`:''}</div></div></div>`;
+    });
+    return `<div class="maq"><h3><span>${m} <span style="font-weight:400;color:var(--dim);font-size:13px">· ${its.length} item(ns)</span></span><span class="rhint">⇅ role para ver mais</span></h3>`+
+      (its.length?`<div class="rolagem" data-m="${m}">${corpo}</div>`:'<div class="empty">Nada programado.</div>')+'</div>';
   }).join('');
+  document.querySelectorAll('.rolagem').forEach(e=>{
+    if(e.scrollHeight>e.clientHeight+2)e.closest('.maq').querySelector('.rhint').style.display='inline-block';
+    if(primeiraVez||modoMudou){const alvo=[...e.querySelectorAll('.dia-h')].find(h=>h.dataset.d>=(modo==='dia'?dia:hoje));if(alvo)e.scrollTop=alvo.offsetTop-6}
+    else if(pos[e.dataset.m]!=null)e.scrollTop=pos[e.dataset.m];
+  });
+  if(itens.length)primeiraVez=false;modoMudou=false;
 }
+let modoMudou=false;
 function editar(id){
   const x=dados.find(d=>d.id===id);if(!x)return;editId=id;fimManual=false;
   $('data').value=x.data;$('maquina').value=x.maquina;$('produto').value=x.produto;$('turno').value=turnoDe(x);$('qtd').value=x.qtdProgramada;
@@ -190,6 +216,6 @@ $('f').addEventListener('submit',async ev=>{
     const dia=p.data;msg(editId?'Programação atualizada.':'Programação salva.',true);limpar();$('dia').value=dia;$('data').value=dia;await carregar();
   }catch(e){msg(e.message,false)}finally{b.disabled=false}
 });
-$('dia').onchange=render;$('hoje').onclick=()=>{$('dia').value=hojeStr();render()};
+$('modo').onchange=()=>{modoMudou=true;render()};$('dia').onchange=()=>{modoMudou=true;render()};$('hoje').onclick=()=>{$('dia').value=hojeStr();modoMudou=true;render()};
 carregar();setInterval(carregar,30000);
 </script></body></html>
