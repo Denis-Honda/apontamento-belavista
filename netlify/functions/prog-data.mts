@@ -31,6 +31,11 @@ async function queryAll(dbId: string, token: string) {
   return out;
 }
 
+function lerLanc(p: any) {
+  const s = ((p && p["Lançamentos (JSON)"] && p["Lançamentos (JSON)"].rich_text) || []).map((x: any) => x.plain_text).join("");
+  try { const v = JSON.parse(s); return Array.isArray(v) ? v : []; } catch { return []; }
+}
+
 function mapProg(pg: any) {
   const p = pg.properties || {};
   return {
@@ -46,6 +51,7 @@ function mapProg(pg: any) {
     setupMin: num(p["Setup (min)"]),
     tempoNecessario: num(p["Tempo Necessário (h)"]),
     turno: sel(p["Turno"]),
+    lancamentos: lerLanc(p),
     status: sel(p["Status"]) || "Não iniciado",
     opNumero: txt(p["Nº OP"]),
     qtdProduzida: num(p["Qtd Produzida"]),

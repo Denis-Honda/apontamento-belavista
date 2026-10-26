@@ -57,6 +57,19 @@ async function senhaOk(senha: string, papel: "pcp" | "apontador"): Promise<boole
 }
 const ACOES_PCP = ["programar", "editar_programacao", "excluir_programacao"];
 
+const TURNOS_VALIDOS = ["1º Turno", "1º / 2º Turno", "2º Turno", "2º / 3º Turno", "3º Turno", "3º / 1º Turno"];
+function lerLanc(page: any): any[] {
+  const s = ((page.properties || {})["Lançamentos (JSON)"]?.rich_text || []).map((x: any) => x.plain_text).join("");
+  try { const v = JSON.parse(s); return Array.isArray(v) ? v : []; } catch { return []; }
+}
+function lancProp(arr: any[]) {
+  const s = JSON.stringify(arr);
+  const parts: any[] = [];
+  for (let i = 0; i < s.length; i += 1900) parts.push({ text: { content: s.slice(i, i + 1900) } });
+  return { rich_text: parts.length ? parts : [{ text: { content: "" } }] };
+}
+const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
+
 async function notion(path: string, method: string, token: string, body: any) {
   const res = await fetch(`https://api.notion.com${path}`, {
     method,
@@ -149,6 +162,29 @@ export default async (req: Request, _ctx: Context) => {
       // permite corrigir o status manualmente (ex.: voltar para Não iniciado)
       if (!p.id || !p.status) throw new Error("id e status são obrigatórios");
       await notion(`/v1/pages/${p.id}`, "PATCH", token, { properties: { Status: sel(p.status) } });
+      return json({ ok: true });
+    }
+
+    // ---- Lançamentos parciais (produção que passa por mais de um turno) ----
+    if (action === "lancar_parcial") {
+      if (!p.id) throw new Error("id é obrigatório");
+      if (!TURNOS_VALIDOS.includes(p.turno)) throw new Error("Informe o turno do lançamento");
+      if (!HHMM.test(p.inicio || "") || !HHMM.test(p.termino || "")) throw new Error("Informe os horários de início e término");
+      const qtd = Number(p.qtd);
+      if (p.qtd === "" || p.qtd === null || p.qtd === undefined || isNaN(qtd) || qtd < 0) throw new Error("Informe o total produzido");
+      const page = await notion(`/v1/pages/${p.id}`, "GET", token, undefined);
+      const st = page.properties?.Status?.select?.name;
+      if (st !== "Em andamento") throw new Error("A produção precisa estar em andamento para receber lançamentos");
+      const arr = lerLanc(page);
+      arr.push({ id: Math.random().toString(36).slice(2, 9), turno: p.turno, inicio: p.inicio, termino: p.termino, qtd });
+      await notion(`/v1/pages/${p.id}`, "PATCH", token, { properties: { "Lançamentos (JSON)": lancProp(arr) } });
+      return json({ ok: true, total: arr.reduce((s, l) => s + (l.qtd || 0), 0), lancamentos: arr.length });
+    }
+    if (action === "excluir_parcial") {
+      if (!p.id || !p.lancId) throw new Error("id e lancId são obrigatórios");
+      const page = await notion(`/v1/pages/${p.id}`, "GET", token, undefined);
+      const arr = lerLanc(page).filter((l) => l.id !== p.lancId);
+      await notion(`/v1/pages/${p.id}`, "PATCH", token, { properties: { "Lançamentos (JSON)": lancProp(arr) } });
       return json({ ok: true });
     }
 
