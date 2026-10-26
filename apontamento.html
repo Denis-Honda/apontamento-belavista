@@ -116,11 +116,24 @@ function acao(x){
     <div><label>Nº da Ordem de Produção *</label><input id="op-${x.id}" inputmode="numeric"></div>
     <div><label>Hora de início real *</label><input type="time" id="ir-${x.id}" value="${agora()}"></div>
     <div style="align-self:end"><button class="ok" onclick="iniciar('${x.id}')">▶ Iniciar produção</button></div></div>`;
-  if(x.status==='Em andamento')return `<div class="s" style="margin-top:6px">OP ${x.opNumero||'–'} · iniciada às ${x.inicioReal||'--:--'}</div><div class="grid" style="margin-top:10px">
-    <div><label>Hora de término real *</label><input type="time" id="tr-${x.id}" value="${agora()}"></div>
-    <div><label>Sacos produzidos *</label><input type="number" min="0" inputmode="numeric" id="qp-${x.id}"></div>
-    <div style="align-self:end" class="row"><button class="ok" onclick="concluir('${x.id}')">✔ Concluir</button><button class="sec sm" onclick="status('${x.id}','Não iniciado')">Voltar p/ não iniciado</button></div></div>`;
-  return `<div class="s" style="margin-top:6px">OP ${x.opNumero||'–'} · real ${x.inicioReal||'--:--'} às ${x.terminoReal||'--:--'} · <b>${fmtN(x.qtdProduzida)}</b> sacos produzidos (programado ${fmtN(x.qtdProgramada)})</div>
+  if(x.status==='Em andamento'){
+    const L=x.lancamentos||[],soma=L.reduce((s,l)=>s+(l.qtd||0),0),ult=L.length?L[L.length-1].termino:(x.inicioReal||agora());
+    const opts=ORDEM_T.map(o=>`<option${o===turnoDe({inicioPrevisto:ult})?' selected':''}>${o}</option>`).join('');
+    const tabL=L.length?'<table style="width:100%;border-collapse:collapse;font-size:13.5px;margin-top:6px"><tr style="text-align:left;color:var(--dim)"><th>Turno</th><th>Início</th><th>Término</th><th>Produzido</th><th></th></tr>'+L.map(l=>`<tr style="border-top:1px solid var(--bd)"><td>${l.turno}</td><td>${l.inicio}</td><td>${l.termino}</td><td>${fmtN(l.qtd)}</td><td><button class="bad sm" onclick="excluirLanc('${x.id}','${l.id}')">×</button></td></tr>`).join('')+'</table>':'<div class="empty" style="font-size:13px">Nenhum lançamento ainda.</div>';
+    return `<div class="s" style="margin-top:6px">OP ${x.opNumero||'–'} · iniciada às ${x.inicioReal||'--:--'}</div>
+    <div style="margin-top:10px;padding:10px;border:1px dashed var(--bd);border-radius:10px"><b style="font-size:13px">Lançamentos por turno</b> <span class="s">· total lançado: <b>${fmtN(soma)}</b> de ${fmtN(x.qtdProgramada)} sacos</span>${tabL}
+    <div class="grid" style="margin-top:10px">
+      <div><label>Turno *</label><select id="lt-${x.id}">${opts}</select></div>
+      <div><label>Hora início *</label><input type="time" id="li-${x.id}" value="${ult}"></div>
+      <div><label>Hora término *</label><input type="time" id="lf-${x.id}" value="${agora()}"></div>
+      <div><label>Total produzido *</label><input type="number" min="0" inputmode="numeric" id="lq-${x.id}"></div>
+      <div style="align-self:end"><button class="sec" onclick="addLanc('${x.id}')">＋ Adicionar lançamento</button></div></div></div>
+    <div class="grid" style="margin-top:12px">
+      <div><label>Hora de término real *</label><input type="time" id="tr-${x.id}" value="${L.length?ult:agora()}"></div>
+      <div><label>Total produzido na ordem *</label><input type="number" min="0" inputmode="numeric" id="qp-${x.id}" value="${L.length?soma:''}"></div>
+      <div style="align-self:end" class="row"><button class="ok" onclick="concluir('${x.id}')">✔ Finalizar produção</button><button class="sec sm" onclick="status('${x.id}','Não iniciado')">Voltar p/ não iniciado</button></div></div>`;
+  }
+  return `<div class="s" style="margin-top:6px">OP ${x.opNumero||'–'} · real ${x.inicioReal||'--:--'} às ${x.terminoReal||'--:--'} · <b>${fmtN(x.qtdProduzida)}</b> sacos produzidos (programado ${fmtN(x.qtdProgramada)})</div>${(x.lancamentos||[]).length?'<div class="s">Lançamentos: '+x.lancamentos.map(l=>`${l.turno} ${l.inicio}–${l.termino}: ${fmtN(l.qtd)}`).join(' · ')+'</div>':''}
     <div class="row" style="margin-top:8px"><button class="sec sm" onclick="status('${x.id}','Em andamento')">Reabrir</button></div>`;
 }
 function render(){renderFaltas();
@@ -156,7 +169,9 @@ $('ff').addEventListener('submit',async ev=>{
 });
 async function run(fn){try{await fn();await carregar()}catch(e){flash($('msg'),e.message,false)}}
 const iniciar=id=>run(async()=>{await api('iniciar_producao',{id,opNumero:$('op-'+id).value.trim(),inicioReal:$('ir-'+id).value});flash($('msg'),'Produção iniciada.',true)});
-const concluir=id=>run(async()=>{await api('concluir_producao',{id,terminoReal:$('tr-'+id).value,qtdProduzida:$('qp-'+id).value});flash($('msg'),'Produção concluída.',true)});
+const concluir=id=>run(async()=>{await api('concluir_producao',{id,terminoReal:$('tr-'+id).value,qtdProduzida:$('qp-'+id).value});flash($('msg'),'Produção finalizada.',true)});
+const addLanc=id=>run(async()=>{await api('lancar_parcial',{id,turno:$('lt-'+id).value,inicio:$('li-'+id).value,termino:$('lf-'+id).value,qtd:$('lq-'+id).value});flash($('msg'),'Lançamento adicionado.',true)});
+const excluirLanc=(id,lancId)=>{if(!confirm('Excluir este lançamento?'))return;run(async()=>{await api('excluir_parcial',{id,lancId})})};
 const status=(id,s)=>run(async()=>{await api('status_producao',{id,status:s})});
 function calcHoras(){
   const i=$('p-ini').value,f=$('p-fim').value;if(!i||!f){$('p-horas').value='';return}
@@ -190,11 +205,15 @@ function exportarExcel(){
   fs.forEach(x=>{tf+=x.quantidade||0;fa.push([d,x.turno||'',x.funcao,x.quantidade||0,x.obs||''])});
   fa.push([]);fa.push(['TOTAL','','',tf,'']);
   const w3=XLSX.utils.aoa_to_sheet(fa);w3['!cols']=[{wch:11},{wch:10},{wch:28},{wch:20},{wch:30}];
+  const la=[['Data','Máquina','Produto','Nº OP','Turno do lançamento','Início','Término','Total produzido']];let tl=0;
+  its.forEach(x=>(x.lancamentos||[]).forEach(l=>{tl+=l.qtd||0;la.push([d,x.maquina,x.produto,x.opNumero||'',l.turno,l.inicio,l.termino,l.qtd||0])}));
+  la.push([]);la.push(['TOTAL','','','','','','',tl]);
+  const w4=XLSX.utils.aoa_to_sheet(la);w4['!cols']=[{wch:11},{wch:13},{wch:46},{wch:10},{wch:18},{wch:9},{wch:9},{wch:15}];
   const wb=XLSX.utils.book_new(),w1=XLSX.utils.aoa_to_sheet(a),w2=XLSX.utils.aoa_to_sheet(h);
   w1['!cols']=[{wch:11},{wch:10},{wch:13},{wch:46},{wch:10},{wch:14},{wch:14},{wch:10},{wch:11},{wch:10},{wch:10},{wch:10},{wch:10},{wch:10},{wch:14}];
   w2['!cols']=[{wch:11},{wch:13},{wch:26},{wch:8},{wch:8},{wch:12},{wch:30}];
   for(let r=1;r<=a.length;r++){const c=w1['I'+r];if(c&&typeof c.v==='number')c.z='0.0%'}
-  XLSX.utils.book_append_sheet(wb,w1,'Planejado x Realizado');XLSX.utils.book_append_sheet(wb,w2,'Horas paradas');XLSX.utils.book_append_sheet(wb,w3,'Faltas de colaboradores');
+  XLSX.utils.book_append_sheet(wb,w1,'Planejado x Realizado');XLSX.utils.book_append_sheet(wb,w2,'Horas paradas');XLSX.utils.book_append_sheet(wb,w3,'Faltas de colaboradores');XLSX.utils.book_append_sheet(wb,w4,'Lançamentos por turno');
   XLSX.writeFile(wb,'apontamento_'+dia+'.xlsx');
 }
 $('excel').onclick=exportarExcel;
