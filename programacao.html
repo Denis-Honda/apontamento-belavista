@@ -47,8 +47,11 @@ button.sec{background:#e9edf4;color:var(--tx)}button.ok{background:var(--ok)}but
 <div><label>Turno *</label><select id="turno" required></select></div>
 <div style="grid-column:span 2"><label>Produto *</label><select id="produto" required></select></div>
 <div><label>Qtd de sacos a produzir *</label><input type="number" id="qtd" min="1" inputmode="numeric" required></div>
+<div><label>Tempo padrão (sacos/hora) *</label><input type="number" id="tp" min="1" step="any" inputmode="decimal" required></div>
 <div><label>Início previsto *</label><input type="time" id="ini" required></div>
+<div><label>Tempo necessário (h) · calculado</label><input type="text" id="tn" readonly placeholder="0,00"></div>
 <div><label>Término previsto *</label><input type="time" id="fim" required></div>
+<div><label>Tempo de setup (min)</label><input type="number" id="setup" min="0" inputmode="numeric" placeholder="0"></div>
 <div><label>Tempo de secagem (min)</label><input type="number" id="seca" min="0" inputmode="numeric" placeholder="0"></div>
 </div>
 <div class="row" style="margin-top:12px"><button type="submit" id="btn-save">Programar</button><button type="button" class="sec" id="btn-cancel" style="display:none">Cancelar edição</button></div>
@@ -119,7 +122,7 @@ const PRODUTOS = [
 
 const TURNOS=["1º Turno","2º Turno","3º Turno"];
 function turnoDe(x){if(x.turno)return x.turno;const h=parseInt((x.inicioPrevisto||'').split(':')[0],10);if(isNaN(h))return '';return h>=6&&h<14?'1º Turno':h>=14&&h<22?'2º Turno':'3º Turno'}
-const RATE={};PRODUTOS.forEach(p=>RATE[p[0]]=p[1]);
+const RATE={},SETUP={};PRODUTOS.forEach(p=>{RATE[p[0]]=p[1];SETUP[p[0]]=Math.round((p[2]||0)*60)});
 let dados=[],editId=null,fimManual=false;
 const $=id=>document.getElementById(id);
 const hojeStr=()=>new Date(Date.now()-3*3600000).toISOString().slice(0,10);
@@ -132,12 +135,17 @@ $('data').value=hojeStr();$('dia').value=hojeStr();
 
 function sugerirTurno(){if($('turno').value||!$('ini').value)return;$('turno').value=turnoDe({inicioPrevisto:$('ini').value})}
 $('ini').addEventListener('input',sugerirTurno);
-function sugerirFim(){
-  if(fimManual)return;const r=RATE[$('produto').value],q=+$('qtd').value,i=$('ini').value;
-  if(!r||!q||!i)return;const [h,m]=i.split(':').map(Number);let t=h*60+m+Math.round(q/r*60);t%=1440;
-  $('fim').value=String(Math.floor(t/60)).padStart(2,'0')+':'+String(t%60).padStart(2,'0');
+// Tempo necessário = sacos ÷ sacos/hora. Término previsto = início + tempo necessário + setup.
+function recalcular(){
+  const q=+$('qtd').value,tp=+$('tp').value,i=$('ini').value,su=+$('setup').value||0;
+  if(!q||!tp){$('tn').value='';return}
+  const tn=q/tp;$('tn').value=tn.toFixed(2).replace('.',',');
+  if(fimManual||!i)return;
+  const [h,m]=i.split(':').map(Number);const tot=(h*60+m+Math.round(tn*60)+su)%1440;
+  $('fim').value=String(Math.floor(tot/60)).padStart(2,'0')+':'+String(tot%60).padStart(2,'0');
 }
-['produto','qtd','ini'].forEach(id=>$(id).addEventListener('input',sugerirFim));
+$('produto').addEventListener('change',()=>{const p=$('produto').value;if(RATE[p]){$('tp').value=RATE[p];$('setup').value=SETUP[p]}recalcular()});
+['qtd','tp','ini','setup'].forEach(id=>$(id).addEventListener('input',recalcular));
 $('fim').addEventListener('input',()=>{fimManual=true});
 
 async function api(action,payload){
@@ -155,16 +163,16 @@ function render(){
   $('lista').innerHTML=MAQUINAS.map(m=>{
     const its=itens.filter(x=>x.maquina===m).sort((a,b)=>(a.inicioPrevisto||'').localeCompare(b.inicioPrevisto||''));
     return `<div class="maq"><h3>${m}</h3>`+(its.length?its.map(x=>`<div class="item"><div class="row" style="justify-content:space-between"><div><div class="t">${x.produto} — ${fmtN(x.qtdProgramada)} sacos</div>
-    <div class="s">${turnoDe(x)||'Turno ?'} · ${x.inicioPrevisto||'--:--'} às ${x.terminoPrevisto||'--:--'} · secagem ${x.secagemMin??0} min${x.opNumero?' · OP '+x.opNumero:''}</div></div>
+    <div class="s">${turnoDe(x)||'Turno ?'} · ${x.inicioPrevisto||'--:--'} às ${x.terminoPrevisto||'--:--'} · setup ${x.setupMin??0} min · secagem ${x.secagemMin??0} min${x.tempoNecessario!=null?' · '+x.tempoNecessario.toFixed(2).replace('.',',')+' h necessárias ('+fmtN(x.tempoPadrao)+' sacos/h)':''}${x.opNumero?' · OP '+x.opNumero:''}</div></div>
     <div class="row"><span class="badge ${x.status==='Concluído'?'b-co':x.status==='Em andamento'?'b-ea':'b-ni'}">${x.status}</span>
     <button class="sec sm" onclick="editar('${x.id}')">Editar</button>
     ${x.status==='Não iniciado'?`<button class="bad sm" onclick="excluir('${x.id}')">Excluir</button>`:''}</div></div></div>`).join(''):'<div class="empty">Nada programado.</div>')+'</div>';
   }).join('');
 }
 function editar(id){
-  const x=dados.find(d=>d.id===id);if(!x)return;editId=id;fimManual=true;
+  const x=dados.find(d=>d.id===id);if(!x)return;editId=id;fimManual=false;
   $('data').value=x.data;$('maquina').value=x.maquina;$('produto').value=x.produto;$('turno').value=turnoDe(x);$('qtd').value=x.qtdProgramada;
-  $('ini').value=x.inicioPrevisto;$('fim').value=x.terminoPrevisto;$('seca').value=x.secagemMin??'';
+  $('ini').value=x.inicioPrevisto;$('fim').value=x.terminoPrevisto;$('seca').value=x.secagemMin??'';$('tp').value=x.tempoPadrao??RATE[x.produto]??'';$('setup').value=x.setupMin??SETUP[x.produto]??'';recalcular();$('fim').value=x.terminoPrevisto;
   $('form-title').textContent='Editando programação';$('btn-save').textContent='Salvar alterações';$('btn-cancel').style.display='';
   window.scrollTo({top:0,behavior:'smooth'});
 }
@@ -174,7 +182,7 @@ async function excluir(id){if(!confirm('Excluir esta programação?'))return;try
 $('f').addEventListener('submit',async ev=>{
   ev.preventDefault();const b=$('btn-save');b.disabled=true;
   const p={data:$('data').value,maquina:$('maquina').value,turno:$('turno').value,produto:$('produto').value,qtdProgramada:+$('qtd').value,
-    inicioPrevisto:$('ini').value,terminoPrevisto:$('fim').value,secagemMin:$('seca').value===''?0:+$('seca').value};
+    inicioPrevisto:$('ini').value,terminoPrevisto:$('fim').value,secagemMin:$('seca').value===''?0:+$('seca').value,tempoPadrao:+$('tp').value,setupMin:$('setup').value===''?0:+$('setup').value,tempoNecessario:+(+$('qtd').value/+$('tp').value).toFixed(2)};
   try{
     if(editId){p.id=editId;await api('editar_programacao',p)}else await api('programar',p);
     const dia=p.data;msg(editId?'Programação atualizada.':'Programação salva.',true);limpar();$('dia').value=dia;$('data').value=dia;await carregar();
