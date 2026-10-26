@@ -87,6 +87,8 @@ const MAQUINAS=["Máquina 00","Máquina 01","Máquina 02","Máquina 03","Máquin
 const MOTIVOS=["Falta de energia","Falta de funcionário","Falta de Matéria-prima","Falta de Mecânico","Falta de Embalagem","Limpeza","Manutenção","Máquina quebrada","Reunião","Saída Médico / Particular","Sem demanda","Trator quebrado","Treinamento"];
 const TURNOS=["1º Turno","2º Turno","3º Turno"];
 function turnoDe(x){if(x.turno)return x.turno;const h=parseInt((x.inicioPrevisto||'').split(':')[0],10);if(isNaN(h))return '';return h>=6&&h<14?'1º Turno':h>=14&&h<22?'2º Turno':'3º Turno'}
+const ORDEM_T=["1º Turno","1º / 2º Turno","2º Turno","2º / 3º Turno","3º Turno","3º / 1º Turno"];
+const ordT=x=>{const i=ORDEM_T.indexOf(turnoDe(x));return i<0?99:i};
 const FUNCOES=["Envasador(a)","Operador(a) de Máquina","Operador(a) de Trator","Operador(a) Empilhadeira","Etiquetador(a)","Preparador(a) de Aditivos"];
 let prog=[],paradas=[],faltas=[],faltasErro=null;
 const $=id=>document.getElementById(id);
@@ -172,7 +174,7 @@ $('dia').onchange=()=>{$('p-data').value=$('dia').value;$('f-data').value=$('dia
 $('hoje').onclick=()=>{$('dia').value=hojeStr();$('p-data').value=hojeStr();$('f-data').value=hojeStr();render()};
 $('atualizar').onclick=carregar;
 function exportarExcel(){
-  const dia=$('dia').value,its=prog.filter(x=>x.data===dia).sort((a,b)=>turnoDe(a).localeCompare(turnoDe(b))||a.maquina.localeCompare(b.maquina)||(a.inicioPrevisto||'').localeCompare(b.inicioPrevisto||'')),ps=paradas.filter(x=>x.data===dia);
+  const dia=$('dia').value,its=prog.filter(x=>x.data===dia).sort((a,b)=>ordT(a)-ordT(b)||a.maquina.localeCompare(b.maquina)||(a.inicioPrevisto||'').localeCompare(b.inicioPrevisto||'')),ps=paradas.filter(x=>x.data===dia);
   if(typeof XLSX==='undefined'){alert('Biblioteca de Excel não carregou. Verifique a conexão e tente novamente.');return}
   const d=fmtD(dia);
   const a=[['Data','Turno','Máquina','Produto','Nº OP','Qtd planejada (sacos)','Qtd realizada (sacos)','Diferença','% realizado','Início previsto','Término previsto','Início real','Término real','Secagem (min)','Status']];

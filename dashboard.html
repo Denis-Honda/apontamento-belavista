@@ -70,6 +70,8 @@ const fmtN=n=>(n==null?0:Number(n)).toLocaleString('pt-BR');
 const fmtH=h=>h.toFixed(1).replace('.',',')+' h';
 const TURNOS=["1º Turno","2º Turno","3º Turno"];
 function turnoDe(x){if(x.turno)return x.turno;const h=parseInt((x.inicioPrevisto||'').split(':')[0],10);if(isNaN(h))return '';return h>=6&&h<14?'1º Turno':h>=14&&h<22?'2º Turno':'3º Turno'}
+const ORDEM_T=["1º Turno","1º / 2º Turno","2º Turno","2º / 3º Turno","3º Turno","3º / 1º Turno"];
+const ordT=x=>{const i=ORDEM_T.indexOf(turnoDe(x));return i<0?99:i};
 let prog=[],par=[];
 $('dia').value=hojeStr();
 async function carregar(){
@@ -130,7 +132,7 @@ function render(){
     return `<div class="mc done"><h3>${m}<span class="badge b-co">Concluído</span></h3><div class="p">Programação do dia finalizada</div>${bar}${parTxt}${resumoMaquina(m,dia,null)}</div>`;
   }).join('');
   // tabela
-  const ord=its.slice().sort((a,b)=>turnoDe(a).localeCompare(turnoDe(b))||(a.inicioPrevisto||'').localeCompare(b.inicioPrevisto||'')||a.maquina.localeCompare(b.maquina));
+  const ord=its.slice().sort((a,b)=>ordT(a)-ordT(b)||(a.inicioPrevisto||'').localeCompare(b.inicioPrevisto||'')||a.maquina.localeCompare(b.maquina));
   $('prog').innerHTML=ord.length?'<table><tr><th>Turno</th><th>Máquina</th><th>Produto</th><th>Programado</th><th>Previsto</th><th>Real</th><th>Produzido</th><th>Status</th></tr>'+ord.map(x=>
     `<tr><td>${turnoDe(x).replace(' Turno','T')}</td><td>${x.maquina}</td><td>${x.produto}</td><td>${fmtN(x.qtdProgramada)}</td><td>${x.inicioPrevisto||'--:--'} – ${x.terminoPrevisto||'--:--'}</td><td>${x.inicioReal?x.inicioReal+' – '+(x.terminoReal||'…'):'–'}</td><td>${x.status==='Concluído'?fmtN(x.qtdProduzida):'–'}</td>
     <td><span class="badge ${x.status==='Concluído'?'b-co':x.status==='Em andamento'?'b-ea':'b-ni'}">${x.status}</span></td></tr>`).join('')+'</table>':'<div class="empty">Nenhuma programação para este dia.</div>';

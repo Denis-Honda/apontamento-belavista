@@ -122,6 +122,8 @@ const PRODUTOS = [
 
 const TURNOS=["1º Turno","2º Turno","3º Turno"];
 function turnoDe(x){if(x.turno)return x.turno;const h=parseInt((x.inicioPrevisto||'').split(':')[0],10);if(isNaN(h))return '';return h>=6&&h<14?'1º Turno':h>=14&&h<22?'2º Turno':'3º Turno'}
+const ORDEM_T=["1º Turno","1º / 2º Turno","2º Turno","2º / 3º Turno","3º Turno","3º / 1º Turno"];
+const ordT=x=>{const i=ORDEM_T.indexOf(turnoDe(x));return i<0?99:i};
 const RATE={},SETUP={};PRODUTOS.forEach(p=>{RATE[p[0]]=p[1];SETUP[p[0]]=Math.round((p[2]||0)*60)});
 let dados=[],editId=null,fimManual=false;
 const $=id=>document.getElementById(id);
@@ -130,7 +132,7 @@ const fmtD=d=>d?d.split('-').reverse().join('/'):'';
 const fmtN=n=>n==null?'–':Number(n).toLocaleString('pt-BR');
 function msg(t,ok){const m=$('msg');m.textContent=t;m.className='msg '+(ok?'ok':'err');setTimeout(()=>{m.className='msg'},5000)}
 function fill(sel,arr,ph){sel.innerHTML=(ph?`<option value="">${ph}</option>`:'')+arr.map(a=>`<option>${a}</option>`).join('')}
-fill($('maquina'),MAQUINAS,'Selecione');fill($('turno'),TURNOS,'Selecione');fill($('produto'),PRODUTOS.map(p=>p[0]),'Selecione o produto');
+fill($('maquina'),MAQUINAS,'Selecione');fill($('turno'),ORDEM_T,'Selecione');fill($('produto'),PRODUTOS.map(p=>p[0]),'Selecione o produto');
 $('data').value=hojeStr();$('dia').value=hojeStr();
 
 function sugerirTurno(){if($('turno').value||!$('ini').value)return;$('turno').value=turnoDe({inicioPrevisto:$('ini').value})}
