@@ -1,0 +1,71 @@
+<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Painel – Horas Paradas e Faltas | Bela Vista</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,Segoe UI,Arial,sans-serif;background:#f1f4f8;color:#1c2733}
+header{background:#16324f;color:#fff;padding:12px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+header img{height:42px;background:#fff;border-radius:6px;padding:3px}header h1{font-size:18px;margin:0;flex:1}
+header small{opacity:.75}
+main{max-width:1200px;margin:0 auto;padding:16px}
+.bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+.bar button,.bar input{font:inherit;padding:7px 12px;border-radius:8px;border:1px solid #c5cedb;background:#fff}
+.bar button{cursor:pointer}.bar button.on{background:#b0262a;color:#fff;border-color:#b0262a}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:14px}
+.kpi{background:#fff;border-radius:10px;padding:14px;border-left:5px solid #16324f;box-shadow:0 1px 3px #0001}
+.kpi.r{border-color:#b0262a}.kpi b{display:block;font-size:24px;margin-top:4px}.kpi span{font-size:12px;color:#5b6b7c;text-transform:uppercase;letter-spacing:.03em}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:14px}
+.card{background:#fff;border-radius:10px;padding:14px;box-shadow:0 1px 3px #0001}
+.card h2{font-size:15px;margin:0 0 10px;color:#16324f}
+.row{display:grid;grid-template-columns:150px 1fr 60px;gap:8px;align-items:center;margin:5px 0;font-size:13px}
+.row .n{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.row .t{background:#e9eef4;border-radius:5px;height:16px}
+.row .t i{display:block;height:100%;border-radius:5px;background:#16324f}.row.r .t i{background:#b0262a}.row .v{text-align:right;font-weight:600}
+table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:6px;text-align:left;border-bottom:1px solid #e5eaf0}th{color:#5b6b7c;font-size:12px}
+.empty{color:#8493a3;padding:12px;text-align:center;font-size:13px}.badge{background:#eef2f7;border-radius:10px;padding:2px 8px;font-size:12px}
+</style></head><body>
+<header><img src="logo.png" alt="Bela Vista" onerror="this.style.display='none'"><h1>Horas Paradas e Faltas de Colaboradores</h1><small id="upd"></small></header>
+<main>
+<div class="bar" id="bar"><button data-p="hoje">Hoje</button><button data-p="7">Últimos 7 dias</button><button data-p="mes" class="on">Mês atual</button><button data-p="ant">Mês anterior</button>
+<span style="margin-left:auto"></span><input type="date" id="de"><input type="date" id="ate"></div>
+<div class="kpis" id="kpis"></div>
+<div class="grid">
+<div class="card"><h2>Horas paradas por máquina</h2><div id="g-maq"></div></div>
+<div class="card"><h2>Horas paradas por motivo</h2><div id="g-mot"></div></div>
+<div class="card"><h2>Horas paradas por dia</h2><div id="g-dia"></div></div>
+<div class="card"><h2>Faltas por função</h2><div id="g-fun"></div></div>
+<div class="card"><h2>Faltas por turno</h2><div id="g-tur"></div></div>
+<div class="card"><h2>Faltas por dia</h2><div id="g-fdia"></div></div>
+<div class="card" style="grid-column:1/-1"><h2>Últimas paradas</h2><div id="l-par"></div></div>
+<div class="card" style="grid-column:1/-1"><h2>Últimas faltas</h2><div id="l-fal"></div></div>
+</div></main>
+<script>
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmtD=d=>d?d.split('-').reverse().join('/'):'';const fmtH=h=>(Math.round(h*100)/100).toFixed(2).replace('.',',');
+const hoje=()=>new Date(Date.now()-3*3600000).toISOString().slice(0,10);
+let D={paradas:[],faltas:[]},per='mes';
+function setPer(p){per=p;const h=hoje(),[y,m]=h.split('-').map(Number);const pad=n=>String(n).padStart(2,'0');
+ if(p==='hoje'){$('de').value=h;$('ate').value=h}
+ else if(p==='7'){$('de').value=new Date(Date.now()-3*3600000-6*864e5).toISOString().slice(0,10);$('ate').value=h}
+ else if(p==='mes'){$('de').value=`${y}-${pad(m)}-01`;$('ate').value=h}
+ else if(p==='ant'){const py=m===1?y-1:y,pm=m===1?12:m-1;$('de').value=`${py}-${pad(pm)}-01`;$('ate').value=new Date(Date.UTC(py,pm,0)).toISOString().slice(0,10)}
+ document.querySelectorAll('#bar button').forEach(b=>b.classList.toggle('on',b.dataset.p===p));render()}
+document.querySelectorAll('#bar button').forEach(b=>b.onclick=()=>setPer(b.dataset.p));
+['de','ate'].forEach(i=>$(i).onchange=()=>{document.querySelectorAll('#bar button').forEach(b=>b.classList.remove('on'));render()});
+function agr(arr,k,v){const m={};arr.forEach(x=>{const n=x[k]||'–';m[n]=(m[n]||0)+(v?x[v]||0:1)});return Object.entries(m).sort((a,b)=>b[1]-a[1])}
+function bars(el,ent,red,fmt,ordemChave){if(ordemChave)ent.sort((a,b)=>a[0].localeCompare(b[0]));
+ const mx=Math.max(...ent.map(e=>e[1]),0)||1;
+ $(el).innerHTML=ent.length?ent.map(([n,v])=>`<div class="row ${red?'r':''}"><div class="n" title="${esc(n)}">${esc(ordemChave?fmtD(n):n)}</div><div class="t"><i style="width:${v/mx*100}%"></i></div><div class="v">${fmt?fmt(v):v}</div></div>`).join(''):'<div class="empty">Sem dados no período.</div>'}
+function render(){
+ const de=$('de').value,ate=$('ate').value;
+ const ps=D.paradas.filter(x=>x.data>=de&&x.data<=ate),fs=D.faltas.filter(x=>x.data>=de&&x.data<=ate);
+ const th=ps.reduce((s,x)=>s+(x.horasParadas||0),0),tf=fs.reduce((s,x)=>s+(x.quantidade||0),0);
+ const am=agr(ps,'maquina','horasParadas'),mo=agr(ps,'motivo','horasParadas'),af=agr(fs,'funcao','quantidade');
+ $('kpis').innerHTML=`<div class="kpi"><span>Horas paradas</span><b>${fmtH(th)} h</b></div><div class="kpi"><span>Nº de paradas</span><b>${ps.length}</b></div><div class="kpi"><span>Máquina mais parada</span><b style="font-size:18px">${am[0]?esc(am[0][0]):'–'}</b></div><div class="kpi"><span>Principal motivo</span><b style="font-size:18px">${mo[0]?esc(mo[0][0]):'–'}</b></div><div class="kpi r"><span>Total de faltas</span><b>${tf}</b></div><div class="kpi r"><span>Função com mais faltas</span><b style="font-size:18px">${af[0]?esc(af[0][0]):'–'}</b></div>`;
+ bars('g-maq',am,false,fmtH);bars('g-mot',mo,false,fmtH);bars('g-dia',agr(ps,'data','horasParadas'),false,fmtH,1);
+ bars('g-fun',af,true);bars('g-tur',agr(fs,'turno','quantidade'),true);bars('g-fdia',agr(fs,'data','quantidade'),true,null,1);
+ const lp=[...ps].sort((a,b)=>(b.data+b.horaInicio).localeCompare(a.data+a.horaInicio)).slice(0,15);
+ $('l-par').innerHTML=lp.length?'<table><tr><th>Data</th><th>Máquina</th><th>Início</th><th>Término</th><th>Horas</th><th>Motivo</th></tr>'+lp.map(x=>`<tr><td>${fmtD(x.data)}</td><td><b>${esc(x.maquina)}</b></td><td>${esc(x.horaInicio)}</td><td>${esc(x.horaTermino)}</td><td>${fmtH(x.horasParadas)}</td><td><span class="badge">${esc(x.motivo||'–')}</span></td></tr>`).join('')+'</table>':'<div class="empty">Sem paradas no período.</div>';
+ const lf=[...fs].sort((a,b)=>b.data.localeCompare(a.data)).slice(0,15);
+ $('l-fal').innerHTML=lf.length?'<table><tr><th>Data</th><th>Turno</th><th>Função</th><th>Qtd</th></tr>'+lf.map(x=>`<tr><td>${fmtD(x.data)}</td><td>${esc(x.turno||'–')}</td><td><b>${esc(x.funcao)}</b></td><td>${x.quantidade}</td></tr>`).join('')+'</table>':'<div class="empty">Sem faltas no período.</div>';
+}
+async function carregar(){try{const j=await (await fetch('/api/hp-data',{cache:'no-store'})).json();if(j.error)throw new Error(j.error);D=j;$('upd').textContent='Atualizado às '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});render()}catch(e){$('upd').textContent='Falha ao atualizar'}}
+setPer('mes');carregar();setInterval(carregar,120000);
+</script></body></html>

@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Lançamento — Horas Paradas e Faltas</title><link rel="icon" href="/logo.png">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>:root{--bg:#f4f6fa;--card:#fff;--bd:#e2e6ee;--tx:#1b2333;--dim:#667085;--pri:#b0262a;--pri2:#8f1d21;--navy:#16324f;--ok:#157f4f;--okbg:#e5f6ed;--warn:#a96a00;--warnbg:#fff3d6;--bad:#c0322b;--badbg:#fdeceb;--blue:#2563a8}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.45 "Segoe UI",system-ui,Arial,sans-serif}
+header{background:var(--navy);color:#fff;padding:12px 20px;display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;box-shadow:0 2px 8px rgba(0,0,0,.15)}
+.brand{display:flex;align-items:center;gap:14px}.logo{background:#fff;border-radius:10px;padding:5px 12px;display:flex}.logo img{height:38px;width:auto;display:block}
+header h1{margin:0;font-size:17px;font-weight:700;line-height:1.2}header h1 small{display:block;font-weight:400;opacity:.75;font-size:12px}
+nav{display:flex;gap:6px}nav a{color:#fff;text-decoration:none;padding:8px 16px;border-radius:8px;background:rgba(255,255,255,.12);font-weight:600;font-size:14px}nav a.on{background:#fff;color:var(--navy)}
+main{max-width:1120px;margin:0 auto;padding:18px 16px 60px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:18px;margin-bottom:16px;box-shadow:0 1px 2px rgba(16,24,40,.04)}
+.card h2{margin:0 0 14px;font-size:16px;color:var(--navy)}.card h2 small{font-weight:400;color:var(--dim);font-size:12.5px;margin-left:6px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+label{display:block;font-size:12px;font-weight:600;color:var(--dim);margin-bottom:4px}
+input,select,textarea{width:100%;padding:10px 11px;border:1px solid var(--bd);border-radius:9px;font:inherit;background:#fff;color:var(--tx)}
+input:focus,select:focus{outline:2px solid var(--blue);border-color:var(--blue)}input[readonly]{background:#f3f5f9;font-weight:700}
+button{font:inherit;font-weight:700;border:0;border-radius:9px;padding:10px 18px;cursor:pointer;background:var(--pri);color:#fff}button:hover{background:var(--pri2)}
+button.sec{background:#e8ecf3;color:var(--tx)}button.sec:hover{background:#dbe1ec}button.ok{background:var(--ok)}button.bad{background:var(--bad)}button.sm{padding:6px 11px;font-size:13px}button:disabled{opacity:.6;cursor:wait}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.sp{justify-content:space-between}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px;border-bottom:2px solid var(--bd)}
+.tab{background:transparent;color:var(--dim);border-radius:10px 10px 0 0;padding:11px 20px;margin-bottom:-2px;border-bottom:3px solid transparent}.tab:hover{background:#e8ecf3}.tab.on{color:var(--pri);border-bottom-color:var(--pri);background:#fff}
+.sec-p{display:none}.sec-p.on{display:block}
+.msg{padding:10px 12px;border-radius:9px;margin-top:12px;font-weight:600;display:none}.msg.ok{display:block;background:var(--okbg);color:var(--ok)}.msg.err{display:block;background:var(--badbg);color:var(--bad)}
+.empty{color:var(--dim);padding:10px 0}
+table{width:100%;border-collapse:collapse;font-size:14px}th{text-align:left;color:var(--dim);font-size:12px;text-transform:uppercase;letter-spacing:.03em;padding:8px 8px}td{padding:9px 8px;border-top:1px solid var(--bd);vertical-align:middle}
+.scroll{overflow-x:auto}.badge{display:inline-block;padding:2px 10px;border-radius:99px;font-size:12px;font-weight:700;background:var(--badbg);color:var(--bad)}
+.hint{font-size:12.5px;color:var(--dim);margin-top:4px}
+
+#lock,#cfglock{position:fixed;inset:0;background:var(--navy);display:flex;align-items:center;justify-content:center;z-index:99;padding:16px}#cfglock{display:none;background:rgba(22,50,79,.88)}
+.lockbox{background:#fff;border-radius:16px;padding:26px;width:100%;max-width:350px}.lockbox img{height:46px;margin-bottom:10px}.lockbox h2{margin:0 0 6px;color:var(--navy)}.lockbox p{margin:0 0 14px;color:var(--dim);font-size:14px}
+.lockbox .e{color:var(--bad);font-weight:600;margin-top:8px;min-height:20px;font-size:14px}
+.cfg-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}@media(max-width:820px){.cfg-grid{grid-template-columns:1fr}}
+.it{display:flex;gap:6px;margin-bottom:6px;align-items:center}.it input{flex:1}.it button{padding:8px 11px}
+</style></head><body>
+<div id="lock"><form id="lockf" class="lockbox"><img src="/logo.png" alt="Bela Vista"><h2>🔒 Acesso ao lançamento</h2><p>Digite a senha para lançar horas paradas e faltas.</p>
+<input type="password" id="lockpw" placeholder="Senha" autocomplete="current-password" autofocus><div class="row" style="margin-top:12px"><button type="submit">Entrar</button><a href="/painel.html" style="color:var(--dim);font-size:14px">Ver painel</a></div><div class="e" id="locke"></div></form></div>
+<div id="cfglock"><form id="cfgf" class="lockbox"><h2>⚙ Configurações</h2><p>Digite a senha de configurações para editar motivos e funções.</p>
+<input type="password" id="cfgpw" placeholder="Senha de configurações" autocomplete="off"><div class="row" style="margin-top:12px"><button type="submit">Entrar</button><button type="button" class="sec" id="cfgcancel">Cancelar</button></div><div class="e" id="cfge"></div></form></div>
+
+<header><div class="brand"><span class="logo"><img src="/logo.png" alt="Bela Vista"></span><h1>Usina Bela Vista Argamassas<small>Horas paradas e faltas de colaboradores</small></h1></div>
+<nav><a class="on" href="/lancar.html">Lançamento</a><a href="/painel.html">Painel</a></nav></header>
+<main>
+<div class="tabs"><button class="tab on" data-tab="par">⏱ Horas paradas</button><button class="tab" data-tab="falt">👷 Faltas de colaboradores</button><button class="tab" data-tab="cfg">⚙ Configurações</button></div>
+
+<div class="sec-p on" id="p-par">
+<div class="card"><h2>Apontamento de horas paradas</h2>
+<form id="fp" autocomplete="off"><div class="grid">
+<div><label>Máquina *</label><select id="p-maq" required></select></div>
+<div><label>Data *</label><input type="date" id="p-data" required></div>
+<div><label>Horário de início *</label><input type="time" id="p-ini" required></div>
+<div><label>Horário de término *</label><input type="time" id="p-fim" required></div>
+<div><label>Horas paradas</label><input type="text" id="p-horas" readonly placeholder="0,00"></div>
+<div style="grid-column:span 2"><label>Motivo *</label><select id="p-motivo" required></select></div>
+</div><div class="hint" id="p-dica"></div>
+<div style="margin-top:12px"><label>Observações (opcional)</label><input type="text" id="p-obs" maxlength="200"></div>
+<div class="row" style="margin-top:14px"><button type="submit" id="p-btn">Registrar parada</button></div><div id="p-msg" class="msg"></div></form></div>
+<div class="card"><div class="row sp"><h2 style="margin:0">Paradas lançadas</h2><div class="row"><label style="margin:0">Dia</label><input type="date" id="p-dia" style="width:auto"><button class="sec sm" id="p-hoje">Hoje</button></div></div>
+<div id="p-resumo" class="hint" style="margin:8px 0 10px"></div><div class="scroll" id="p-lista"></div></div>
+</div>
+
+<div class="sec-p" id="p-falt">
+<div class="card"><h2>Faltas de colaboradores</h2>
+<form id="ff" autocomplete="off"><div class="grid">
+<div><label>Data *</label><input type="date" id="f-data" required></div>
+<div><label>Turno *</label><select id="f-turno" required></select></div>
+<div style="grid-column:span 2"><label>Função *</label><select id="f-funcao" required></select></div>
+<div><label>Quantidade *</label><input type="number" id="f-qtd" min="1" step="1" inputmode="numeric" value="1" required></div>
+</div><div style="margin-top:12px"><label>Observações (opcional)</label><input type="text" id="f-obs" maxlength="200"></div>
+<div class="row" style="margin-top:14px"><button type="submit" id="f-btn">Registrar falta</button></div><div id="f-msg" class="msg"></div></form></div>
+<div class="card"><div class="row sp"><h2 style="margin:0">Faltas lançadas</h2><div class="row"><label style="margin:0">Dia</label><input type="date" id="f-dia" style="width:auto"><button class="sec sm" id="f-hoje">Hoje</button></div></div>
+<div id="f-resumo" class="hint" style="margin:8px 0 10px"></div><div class="scroll" id="f-lista"></div></div>
+</div>
+
+<div class="sec-p" id="p-cfg">
+<div class="card"><h2>Configurações <small>as alterações valem para os próximos lançamentos; registros já feitos não mudam</small></h2>
+<div class="cfg-grid">
+ <div><h2 style="font-size:15px">Motivos das paradas</h2><div id="l-motivo"></div>
+  <div class="it"><input id="n-motivo" placeholder="Novo motivo…" maxlength="60"><button class="sec" id="a-motivo">＋ Adicionar</button></div>
+  <button class="ok" id="s-motivo" style="margin-top:6px">Salvar motivos</button><div id="m-motivo" class="msg"></div></div>
+ <div><h2 style="font-size:15px">Funções dos colaboradores</h2><div id="l-funcao"></div>
+  <div class="it"><input id="n-funcao" placeholder="Nova função…" maxlength="60"><button class="sec" id="a-funcao">＋ Adicionar</button></div>
+  <button class="ok" id="s-funcao" style="margin-top:6px">Salvar funções</button><div id="m-funcao" class="msg"></div></div>
+</div></div></div>
+
+<div class="card"><div class="row sp"><h2 style="margin:0">Exportar para Excel</h2>
+<div class="row"><label style="margin:0">De</label><input type="date" id="x-de" style="width:auto"><label style="margin:0">Até</label><input type="date" id="x-ate" style="width:auto"><button class="ok" id="excel">⬇ Exportar Excel</button></div></div></div>
+</main>
+<script>
+const MAQUINAS=["Máquina 00","Máquina 01","Máquina 02","Máquina 03","Máquina 04","Máquina 05","Máquina 06"];
+const TURNOS=["1º Turno","2º Turno","3º Turno"];
+let paradas=[],faltas=[],motivos=[],funcoes=[],cfgRows=[],faltasErro=null;
+let SENHA=sessionStorage.getItem('bv-hp-senha')||'',CFG=sessionStorage.getItem('bv-hp-cfg')||'';
+const $=id=>document.getElementById(id);
+const hojeStr=()=>new Date(Date.now()-3*3600000).toISOString().slice(0,10);
+const fmtD=d=>d?d.split('-').reverse().join('/'):'';
+const fmtH=h=>(h==null?0:h).toFixed(2).replace('.',',');
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function flash(el,t,ok){el.textContent=t;el.className='msg '+(ok?'ok':'err');clearTimeout(el._t);el._t=setTimeout(()=>{el.className='msg'},6000)}
+function fill(sel,arr,ph){const v=sel.value;sel.innerHTML=`<option value="">${ph}</option>`+arr.map(a=>`<option>${esc(a)}</option>`).join('');if(arr.includes(v))sel.value=v}
+
+// ---------- acesso ----------
+async function post(action,payload,senha){
+  const r=await fetch('/api/hp-submit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,payload,senha})});
+  const j=await r.json().catch(()=>({error:'Resposta inválida'}));return {status:r.status,j};
+}
+function travar(m){SENHA='';sessionStorage.removeItem('bv-hp-senha');$('lock').style.display='flex';$('locke').textContent=m||''}
+async function entrar(s){const {status}=await post('login',{papel:'lancar'},s);if(status!==200)return false;SENHA=s;sessionStorage.setItem('bv-hp-senha',s);$('lock').style.display='none';return true}
+$('lockf').addEventListener('submit',async ev=>{ev.preventDefault();$('locke').textContent='';if(!(await entrar($('lockpw').value)))$('locke').textContent='Senha incorreta.';$('lockpw').value=''});
+if(SENHA)entrar(SENHA).then(ok=>{if(!ok)travar('')});
+async function api(action,payload,usarCfg){
+  const {status,j}=await post(action,payload,usarCfg?CFG:SENHA);
+  if(status===401){if(usarCfg){CFG='';sessionStorage.removeItem('bv-hp-cfg');abrirCfg('Sessão de configurações expirada.')}else travar('Sessão expirada. Digite a senha novamente.');throw new Error('Senha necessária')}
+  if(status>=400||j.error)throw new Error(j.error||'Erro');return j;
+}
+function abrirCfg(m){$('cfglock').style.display='flex';$('cfge').textContent=m||'';$('cfgpw').focus()}
+$('cfgcancel').onclick=()=>{$('cfglock').style.display='none'};
+$('cfgf').addEventListener('submit',async ev=>{ev.preventDefault();const s=$('cfgpw').value;$('cfgpw').value='';
+  const {status}=await post('login',{papel:'config'},s);if(status!==200){$('cfge').textContent='Senha incorreta.';return}
+  CFG=s;sessionStorage.setItem('bv-hp-cfg',s);$('cfglock').style.display='none';mostrarAba('cfg')});
+
+// ---------- abas ----------
+function mostrarAba(t){document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('on',b.dataset.tab===t));document.querySelectorAll('.sec-p').forEach(s=>s.classList.toggle('on',s.id==='p-'+t))}
+document.querySelectorAll('.tab').forEach(b=>b.onclick=async()=>{
+  if(b.dataset.tab!=='cfg')return mostrarAba(b.dataset.tab);
+  if(CFG){const {status}=await post('login',{papel:'config'},CFG);if(status===200)return mostrarAba('cfg');CFG='';sessionStorage.removeItem('bv-hp-cfg')}
+  abrirCfg('');
+});
+
+// ---------- dados ----------
+async function carregar(){
+  try{const j=await (await fetch('/api/hp-data',{cache:'no-store'})).json();if(j.error)throw new Error(j.error);
+    paradas=j.paradas||[];faltas=j.faltas||[];motivos=j.motivos||[];funcoes=j.funcoes||[];cfgRows=j.config||[];faltasErro=j.faltasErro;
+    fill($('p-motivo'),motivos,'Selecione o motivo');fill($('f-funcao'),funcoes,'Selecione a função');renderParadas();renderFaltas();renderCfg()}
+  catch(e){$('p-lista').innerHTML='<div class="empty">Falha ao carregar: '+esc(e.message)+'</div>'}
+}
+fill($('p-maq'),MAQUINAS,'Selecione a máquina');fill($('f-turno'),TURNOS,'Selecione o turno');
+['p-data','p-dia','f-data','f-dia'].forEach(i=>$(i).value=hojeStr());
+$('x-de').value=hojeStr().slice(0,8)+'01';$('x-ate').value=hojeStr();
+
+// ---------- horas paradas ----------
+function calcHoras(){
+  const i=$('p-ini').value,f=$('p-fim').value;$('p-dica').textContent='';
+  if(!i||!f){$('p-horas').value='';return}
+  const [ih,im]=i.split(':').map(Number),[fh,fm]=f.split(':').map(Number);let d=fh*60+fm-(ih*60+im);
+  if(d<0){d+=1440;$('p-dica').textContent='O término é menor que o início: será considerado no dia seguinte.'}
+  $('p-horas').value=fmtH(d/60);
+}
+$('p-ini').oninput=calcHoras;$('p-fim').oninput=calcHoras;
+function renderParadas(){
+  const dia=$('p-dia').value,ps=paradas.filter(x=>x.data===dia).sort((a,b)=>(a.horaInicio||'').localeCompare(b.horaInicio||''));
+  const tot=ps.reduce((s,x)=>s+(x.horasParadas||0),0);
+  $('p-resumo').textContent=`${fmtD(dia)} · ${ps.length} parada(s) · ${fmtH(tot)} h no total`;
+  $('p-lista').innerHTML=ps.length?'<table><tr><th>Máquina</th><th>Início</th><th>Término</th><th>Horas</th><th>Motivo</th><th>Obs.</th><th></th></tr>'+ps.map(x=>`<tr><td><b>${esc(x.maquina)}</b></td><td>${esc(x.horaInicio)}</td><td>${esc(x.horaTermino)}</td><td>${fmtH(x.horasParadas)}</td><td><span class="badge">${esc(x.motivo||'–')}</span></td><td>${esc(x.obs)}</td><td><button class="bad sm" onclick="excluirParada('${x.id}')">Excluir</button></td></tr>`).join('')+'</table>':'<div class="empty">Nenhuma parada lançada neste dia.</div>';
+}
+$('fp').addEventListener('submit',async ev=>{
+  ev.preventDefault();const b=$('p-btn');b.disabled=true;
+  try{
+    const j=await api('registrar_parada',{maquina:$('p-maq').value,data:$('p-data').value,horaInicio:$('p-ini').value,horaTermino:$('p-fim').value,motivo:$('p-motivo').value,obs:$('p-obs').value});
+    flash($('p-msg'),`Parada registrada (${fmtH(j.horas)} h).`,true);$('p-dia').value=$('p-data').value;
+    $('p-ini').value='';$('p-fim').value='';$('p-horas').value='';$('p-obs').value='';$('p-dica').textContent='';await carregar();
+  }catch(e){flash($('p-msg'),e.message,false)}finally{b.disabled=false}
+});
+async function excluirParada(id){if(!confirm('Excluir esta parada?'))return;try{await api('excluir_parada',{id});await carregar()}catch(e){alert(e.message)}}
+$('p-dia').onchange=renderParadas;$('p-hoje').onclick=()=>{$('p-dia').value=hojeStr();renderParadas()};
+
+// ---------- faltas ----------
+function renderFaltas(){
+  const dia=$('f-dia').value;
+  if(faltasErro){$('f-lista').innerHTML='<div class="empty">O banco de faltas não está acessível no momento.</div>';$('f-resumo').textContent='';return}
+  const fs=faltas.filter(x=>x.data===dia).sort((a,b)=>(a.turno||'').localeCompare(b.turno||''));
+  const tot=fs.reduce((s,x)=>s+(x.quantidade||0),0);
+  $('f-resumo').textContent=`${fmtD(dia)} · ${fs.length} lançamento(s) · ${tot} falta(s) no total`;
+  $('f-lista').innerHTML=fs.length?'<table><tr><th>Turno</th><th>Função</th><th>Qtd</th><th>Obs.</th><th></th></tr>'+fs.map(x=>`<tr><td>${esc(x.turno||'–')}</td><td><b>${esc(x.funcao)}</b></td><td>${x.quantidade}</td><td>${esc(x.obs)}</td><td><button class="bad sm" onclick="excluirFalta('${x.id}')">Excluir</button></td></tr>`).join('')+`<tr style="font-weight:700"><td colspan="2">Total de faltas no dia</td><td>${tot}</td><td colspan="2"></td></tr></table>`:'<div class="empty">Nenhuma falta lançada neste dia.</div>';
+}
+$('ff').addEventListener('submit',async ev=>{
+  ev.preventDefault();const b=$('f-btn');b.disabled=true;
+  try{await api('registrar_falta',{data:$('f-data').value,turno:$('f-turno').value,funcao:$('f-funcao').value,quantidade:+$('f-qtd').value,obs:$('f-obs').value});
+    flash($('f-msg'),'Falta registrada.',true);$('f-dia').value=$('f-data').value;$('f-qtd').value=1;$('f-obs').value='';await carregar()}
+  catch(e){flash($('f-msg'),e.message,false)}finally{b.disabled=false}
+});
+async function excluirFalta(id){if(!confirm('Excluir este lançamento de falta?'))return;try{await api('excluir_falta',{id});await carregar()}catch(e){alert(e.message)}}
+$('f-dia').onchange=renderFaltas;$('f-hoje').onclick=()=>{$('f-dia').value=hojeStr();renderFaltas()};
+
+// ---------- configurações (listas editáveis) ----------
+const lista={Motivo:[],'Função':[]};
+const idl=t=>t==='Motivo'?'motivo':'funcao';
+function renderCfg(){
+  ['Motivo','Função'].forEach(tipo=>{
+    if(lista[tipo]._sujo)return; // não sobrescreve edição em andamento
+    const nomes=tipo==='Motivo'?motivos:funcoes;
+    const rows=cfgRows.filter(r=>r.tipo===tipo);
+    const nova=nomes.map(n=>{const r=rows.find(x=>x.nome===n);return {id:r?r.id:undefined,nome:n}});
+    nova._sujo=false;lista[tipo]=nova;desenhar(tipo);
+  });
+}
+function desenhar(tipo){
+  const k=idl(tipo);
+  $('l-'+k).innerHTML=lista[tipo].map((it,i)=>`<div class="it"><input value="${esc(it.nome)}" maxlength="60" oninput="lista['${tipo}'][${i}].nome=this.value;lista['${tipo}']._sujo=true"><button class="sec" title="Subir" onclick="mover('${tipo}',${i},-1)">↑</button><button class="sec" title="Descer" onclick="mover('${tipo}',${i},1)">↓</button><button class="bad" title="Remover" onclick="remover('${tipo}',${i})">✕</button></div>`).join('')||'<div class="empty">Lista vazia.</div>';
+}
+function mover(t,i,d){const a=lista[t],j=i+d;if(j<0||j>=a.length)return;[a[i],a[j]]=[a[j],a[i]];a._sujo=true;desenhar(t)}
+function remover(t,i){if(!confirm('Remover "'+lista[t][i].nome+'" da lista? Lançamentos antigos continuam guardados.'))return;lista[t].splice(i,1);lista[t]._sujo=true;desenhar(t)}
+['Motivo','Função'].forEach(tipo=>{const k=idl(tipo);
+  $('a-'+k).onclick=()=>{const v=$('n-'+k).value.trim();if(!v)return;if(lista[tipo].some(x=>x.nome.trim().toLowerCase()===v.toLowerCase()))return flash($('m-'+k),'Esse item já existe.',false);lista[tipo].push({nome:v});lista[tipo]._sujo=true;$('n-'+k).value='';desenhar(tipo)};
+  $('n-'+k).addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('a-'+k).click()}});
+  $('s-'+k).onclick=async()=>{const b=$('s-'+k);b.disabled=true;
+    try{await api('salvar_config',{tipo,itens:lista[tipo].map(x=>({id:x.id,nome:x.nome}))},true);lista[tipo]._sujo=false;flash($('m-'+k),'Lista salva.',true);await carregar()}
+    catch(e){flash($('m-'+k),e.message,false)}finally{b.disabled=false}};
+});
+
+// ---------- Excel ----------
+$('excel').onclick=()=>{
+  if(typeof XLSX==='undefined')return alert('A biblioteca de Excel não carregou. Verifique a conexão e tente de novo.');
+  const de=$('x-de').value,ate=$('x-ate').value;if(!de||!ate||de>ate)return alert('Informe um período válido.');
+  const ps=paradas.filter(x=>x.data>=de&&x.data<=ate).sort((a,b)=>(a.data+a.horaInicio).localeCompare(b.data+b.horaInicio));
+  const fs=faltas.filter(x=>x.data>=de&&x.data<=ate).sort((a,b)=>(a.data+(a.turno||'')).localeCompare(b.data+(b.turno||'')));
+  const a=[['Data','Máquina','Turno','Motivo','Início','Término','Horas paradas','Observações']];let th=0;
+  ps.forEach(x=>{th+=x.horasParadas||0;a.push([fmtD(x.data),x.maquina,x.turno||'',x.motivo||'',x.horaInicio,x.horaTermino,x.horasParadas,x.obs||''])});
+  a.push([]);a.push(['TOTAL','','','','','',Math.round(th*100)/100,'']);
+  const f=[['Data','Turno','Função','Quantidade','Observações']];let tf=0;
+  fs.forEach(x=>{tf+=x.quantidade||0;f.push([fmtD(x.data),x.turno||'',x.funcao,x.quantidade||0,x.obs||''])});
+  f.push([]);f.push(['TOTAL','','',tf,'']);
+  const agr=(arr,k,v)=>{const m={};arr.forEach(x=>{const n=x[k]||'–';m[n]=(m[n]||0)+(x[v]||0)});return Object.entries(m).sort((p,q)=>q[1]-p[1])};
+  const r=[['Horas paradas por máquina','Horas'],...agr(ps,'maquina','horasParadas').map(([n,v])=>[n,Math.round(v*100)/100]),[],['Horas paradas por motivo','Horas'],...agr(ps,'motivo','horasParadas').map(([n,v])=>[n,Math.round(v*100)/100]),[],['Faltas por função','Quantidade'],...agr(fs,'funcao','quantidade'),[],['Faltas por turno','Quantidade'],...agr(fs,'turno','quantidade')];
+  const wb=XLSX.utils.book_new(),w1=XLSX.utils.aoa_to_sheet(a),w2=XLSX.utils.aoa_to_sheet(f),w3=XLSX.utils.aoa_to_sheet(r);
+  w1['!cols']=[{wch:11},{wch:13},{wch:10},{wch:26},{wch:8},{wch:8},{wch:13},{wch:34}];w2['!cols']=[{wch:11},{wch:10},{wch:28},{wch:11},{wch:34}];w3['!cols']=[{wch:30},{wch:12}];
+  XLSX.utils.book_append_sheet(wb,w1,'Horas paradas');XLSX.utils.book_append_sheet(wb,w2,'Faltas de colaboradores');XLSX.utils.book_append_sheet(wb,w3,'Resumo');
+  XLSX.writeFile(wb,`horas_paradas_e_faltas_${de}_a_${ate}.xlsx`);
+};
+carregar();
+</script></body></html>
